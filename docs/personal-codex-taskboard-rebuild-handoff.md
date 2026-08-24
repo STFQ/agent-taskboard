@@ -5,6 +5,17 @@
 Taskboard 项目：`个人 Codex 任务看板重构`（`codex`）
 代码基线：`managed-sidebar-launcher-v1`
 
+## 正式代码交接位置
+
+- 开发仓库：[`STFQ/dashi-taskboard`](https://github.com/STFQ/dashi-taskboard)
+- 开发分支：`codex/taskboard-rebuild`
+- 本地工作副本：`/Users/cavalier/Documents/Codex/codex-taskboard-rebuild`
+- `origin`：个人 fork（允许推送）；`upstream`：`chuspeeism/dashi-taskboard`（仅用于拉取同步，已禁用推送）。
+- 已迁入的基线：受管理的 Codex 左侧栏启动器，以及本交接文档。
+- 原始工作副本：`/Users/cavalier/Documents/Codex/2026-08-24/gei-w/work/dashi-taskboard`；只作为历史参考，后续开发不要在其中继续修改。
+
+后续开发从 Taskboard 项目的 `CODEX-1`、`CODEX-2`、`CODEX-3` 开始；它们已处于“等待认领”，但尚未被任何开发会话认领或执行。
+
 ## 为什么要重构
 
 当前 Dashi Taskboard 可以作为代码基线，但不能直接作为稳定成品。已确认的问题不是单点故障，而是任务流的三个核心环节没有闭环：
