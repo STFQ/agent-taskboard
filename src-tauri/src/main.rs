@@ -75,7 +75,6 @@ use windows::{
 const STOP_TIMEOUT: Duration = Duration::from_secs(5);
 #[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 const LAUNCHER_STOP_TIMEOUT: Duration = Duration::from_secs(36);
-const UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(30 * 60);
 // Unique whole-directory snapshots shipped from app-v0.2.0 through v1.1.2.
 const KNOWN_TASKBOARD_SKILL_DIGESTS: [&str; 6] = [
     "eeaaa5d71a2c47688bf62a5eb9f45e9138fe49eb636a46cfd6af8a0f8853e2e0",
@@ -402,7 +401,7 @@ impl LauncherState {
             snapshot: Mutex::new(LauncherSnapshot {
                 phase: "starting".into(),
                 message: "正在启动任务面板…".into(),
-                update_message: "启动后将自动检查更新。".into(),
+                update_message: "本地定制版：自动更新已关闭。".into(),
                 update_available: false,
                 version,
                 app_path: None,
@@ -691,7 +690,7 @@ fn find_codex_app(home_directory: &Path) -> Option<PathBuf> {
 }
 
 #[cfg(target_os = "macos")]
-fn ordinary_codex_process(app_path: &Path) -> Result<Option<u32>, String> {
+fn ordinary_codex_processes(app_path: &Path, codex_profile: &Path) -> Result<Vec<u32>, String> {
     let app_name = app_path
         .file_stem()
         .ok_or_else(|| "无法识别 Codex App 名称".to_string())?;
@@ -705,7 +704,8 @@ fn ordinary_codex_process(app_path: &Path) -> Result<Option<u32>, String> {
     }
 
     let executable = executable.to_string_lossy();
-    let mut ordinary_pid = None;
+    let managed_profile = format!("--user-data-dir={}", codex_profile.display());
+    let mut ordinary_pids = Vec::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
         let line = line.trim_start();
         let Some(separator) = line.find(char::is_whitespace) else {
@@ -715,12 +715,15 @@ fn ordinary_codex_process(app_path: &Path) -> Result<Option<u32>, String> {
         if command != executable && !command.starts_with(&format!("{executable} ")) {
             continue;
         }
-        if command.contains(" --remote-debugging-port=") {
-            return Ok(None);
+        let is_this_launcher_codex =
+            command.contains(" --remote-debugging-port=") && command.contains(&managed_profile);
+        if !is_this_launcher_codex {
+            if let Ok(pid) = line[..separator].parse() {
+                ordinary_pids.push(pid);
+            }
         }
-        ordinary_pid = line[..separator].parse().ok();
     }
-    Ok(ordinary_pid)
+    Ok(ordinary_pids)
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -1261,15 +1264,15 @@ fn start_launcher_locked(
     let codex_profile = state.data_directory.join("codex-profile");
     stop_recorded_child(state);
     #[cfg(target_os = "macos")]
-    let ordinary_codex_pid = ordinary_codex_process(&codex_app)?;
-    #[cfg(target_os = "windows")]
-    let ordinary_codex_pid = ordinary_codex_process(&codex_app, &codex_profile)?;
-    #[cfg(target_os = "linux")]
-    let ordinary_codex_pid = ordinary_codex_process(&codex_app, &codex_profile)?;
-    if let Some(codex_pid) = ordinary_codex_pid {
+    let ordinary_codex_pids = ordinary_codex_processes(&codex_app, &codex_profile)?;
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let ordinary_codex_pids = ordinary_codex_process(&codex_app, &codex_profile)?
+        .into_iter()
+        .collect::<Vec<_>>();
+    if !ordinary_codex_pids.is_empty() {
         let restart = app
             .dialog()
-            .message("需要重新启动 Codex 才能显示任务面板")
+            .message("需要重新启动已打开的 Codex 才能显示任务面板")
             .title("Codex Taskboard")
             .kind(MessageDialogKind::Info)
             .buttons(MessageDialogButtons::OkCancelCustom(
@@ -1287,11 +1290,17 @@ fn start_launcher_locked(
                 snapshot.open_request_pending = false;
             }));
         }
-        append_log(
-            state,
-            &format!("Requesting normal Codex exit for PID {codex_pid}"),
-        );
-        quit_codex_normally(codex_pid)?;
+        for codex_pid in ordinary_codex_pids {
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            if !process_is_running(codex_pid) {
+                continue;
+            }
+            append_log(
+                state,
+                &format!("Requesting normal Codex exit for PID {codex_pid}"),
+            );
+            quit_codex_normally(codex_pid)?;
+        }
     }
     let generation = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
     state.intentional_stop.store(false, Ordering::SeqCst);
@@ -1343,7 +1352,15 @@ fn start_launcher_locked(
     #[cfg(target_os = "windows")]
     command.arg(r"scripts\codex-injector.mjs");
     #[cfg(target_os = "macos")]
-    command.args(["--launch", "--watch", "--open", "--port", &codex_port]);
+    command.args([
+        "--launch",
+        "--watch",
+        "--open",
+        "--strict-sidebar",
+        "--exit-on-codex-exit",
+        "--port",
+        &codex_port,
+    ]);
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     command.args(["--launch", "--watch", "--open", "--cdp-pipe"]);
     command
@@ -1472,13 +1489,19 @@ fn start_launcher_locked(
             return;
         };
         let intentional = event_state.intentional_stop.load(Ordering::SeqCst);
+        // A watched injector exits successfully when its managed Codex window
+        // closes. This is a normal lifecycle transition, not a crash to recover.
+        let normal_codex_exit = matches!(&status, Ok(exit_status) if exit_status.success());
         update_snapshot(&event_app, &event_state, |snapshot| {
             if event_state.generation.load(Ordering::SeqCst) == recovery_token
                 && snapshot.child_pid == Some(pid)
             {
                 snapshot.child_pid = None;
                 snapshot.open_signal_pid = None;
-                if !intentional {
+                if intentional || normal_codex_exit {
+                    snapshot.phase = "stopped".into();
+                    snapshot.message = "Codex 已退出，任务面板服务已停止。".into();
+                } else {
                     snapshot.phase = "error".into();
                     snapshot.message = "任务面板进程已退出，正在恢复…".into();
                 }
@@ -1490,7 +1513,7 @@ fn start_launcher_locked(
         );
         terminate_process_group(pid);
         clear_pid_record(&event_state, pid);
-        if intentional {
+        if intentional || normal_codex_exit {
             return;
         }
         thread::sleep(Duration::from_secs(2));
@@ -1999,7 +2022,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(ActivationPolicy::Accessory);
+            app.set_activation_policy(ActivationPolicy::Regular);
             let home_directory = app.path().home_dir()?;
             let bundled_skill = app
                 .path()
@@ -2228,24 +2251,7 @@ fn main() {
                 })
                 .build(app)?;
 
-            let periodic_update_app = app.handle().clone();
-            let periodic_update_state = Arc::clone(&state);
-            let periodic_check_update = check_update.clone();
-            let periodic_quit = quit.clone();
-            thread::spawn(move || loop {
-                thread::sleep(UPDATE_CHECK_INTERVAL);
-                let app_handle = periodic_update_app.clone();
-                let state = Arc::clone(&periodic_update_state);
-                let check_update = periodic_check_update.clone();
-                let quit = periodic_quit.clone();
-                tauri::async_runtime::spawn(async move {
-                    offer_update(&app_handle, &state, &check_update, &quit, false).await;
-                });
-            });
-
             let app_handle = app.handle().clone();
-            let startup_check_update = check_update.clone();
-            let startup_quit = quit.clone();
             tauri::async_runtime::spawn(async move {
                 if let Some((legacy_skill, backup_path)) = legacy_skill_conflict {
                     match resolve_legacy_skill_conflict(&app_handle, &legacy_skill, &backup_path) {
@@ -2279,14 +2285,6 @@ fn main() {
                         ),
                     );
                 }
-                offer_update(
-                    &app_handle,
-                    &state,
-                    &startup_check_update,
-                    &startup_quit,
-                    false,
-                )
-                .await;
             });
             Ok(())
         })

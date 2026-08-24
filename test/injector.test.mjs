@@ -213,6 +213,18 @@ test("the package injection command remains resident for tab-triggered recovery"
   assert.match(source, /__codexTaskboardHostStartupTokenV1/);
 });
 
+test("managed sidebar mode refuses browser fallback and exits with its Codex window", () => {
+  assert.match(source, /strictSidebar: false/);
+  assert.match(source, /exitOnCodexExit: false/);
+  assert.match(source, /arg === "--strict-sidebar"/);
+  assert.match(source, /arg === "--exit-on-codex-exit"/);
+  assert.match(source, /if \(options\.strictSidebar && runningCodex\.length > 0\)/);
+  assert.match(source, /Codex 已在运行，但没有可用的侧栏注入通道/);
+  assert.match(source, /const stopAfterManagedCodexExit/);
+  assert.match(source, /managedCodexExited: true/);
+  assert.match(source, /if \(options\.exitOnCodexExit\)/);
+});
+
 test("attach reconciles the renderer against a hashed current injection source", () => {
   assert.match(source, /createHash\("sha256"\)/);
   assert.match(source, /__CODEX_TASKBOARD_SOURCE_HASH__/);

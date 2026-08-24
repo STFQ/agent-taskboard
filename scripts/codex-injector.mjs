@@ -115,6 +115,8 @@ function parseArgs(argv) {
     attachExisting: false,
     startupToken: null,
     daemon: false,
+    strictSidebar: false,
+    exitOnCodexExit: false,
     screenshot: null,
     appPath: process.platform === "linux" ? "/usr/bin/chatgpt" : "/Applications/ChatGPT.app",
   };
@@ -128,6 +130,8 @@ function parseArgs(argv) {
     else if (arg === "--refresh") options.refresh = true;
     else if (arg === "--refresh-if-running") options.refreshIfRunning = true;
     else if (arg === "--attach-existing") options.attachExisting = true;
+    else if (arg === "--strict-sidebar") options.strictSidebar = true;
+    else if (arg === "--exit-on-codex-exit") options.exitOnCodexExit = true;
     else if (arg === "--startup-token") {
       options.startupToken = argv[++index];
       if (!/^[a-z0-9-]{1,100}$/i.test(options.startupToken || "")) {
@@ -2133,6 +2137,10 @@ async function main() {
       console.error(`Cleanup failed: ${error.message}`);
     });
   };
+  const stopAfterManagedCodexExit = () => {
+    console.log(JSON.stringify({ managedCodexExited: true }));
+    requestStop();
+  };
   if (options.watch) {
     if (process.platform === "win32") {
       openControl = createInterface({ input: process.stdin, terminal: false });
@@ -2173,6 +2181,11 @@ async function main() {
     if (stopping) return false;
     if (!options.cdpPipe) {
       const runningCodex = codexAppProcesses(options.appPath);
+      if (options.strictSidebar && runningCodex.length > 0) {
+        throw new Error(
+          "Codex 已在运行，但没有可用的侧栏注入通道。请通过 Codex Taskboard 重新启动 Codex。",
+        );
+      }
       let debuggingCodexFound = false;
       for (const record of runningCodex) {
         const port = codexProcessDebuggingPort(record);
@@ -2417,6 +2430,10 @@ async function main() {
       if (nativeCodexBrowser) {
         if (codexAppProcesses(options.appPath).length === 0) {
           nativeCodexBrowser = false;
+          if (options.exitOnCodexExit) {
+            stopAfterManagedCodexExit();
+            break;
+          }
           idleAfterNormalExit = true;
           console.error(
             "Waiting for Codex after exit; open Codex Taskboard again to restart it.",
@@ -2481,6 +2498,10 @@ async function main() {
             cdpRuntime.close();
             cdpRuntime = null;
             codexProcess = null;
+            if (options.exitOnCodexExit) {
+              stopAfterManagedCodexExit();
+              break;
+            }
             idleAfterNormalExit = true;
             console.error(
               "Waiting for Codex after normal exit; open Codex Taskboard again to restart it.",
@@ -2511,6 +2532,10 @@ async function main() {
             const exitCode = codexProcess.exitCode;
             codexProcess = null;
             if (exitCode === 0) {
+              if (options.exitOnCodexExit) {
+                stopAfterManagedCodexExit();
+                break;
+              }
               idleAfterNormalExit = true;
               console.error(
                 "Waiting for Codex after normal exit; open Codex Taskboard again to restart it.",
@@ -2528,6 +2553,10 @@ async function main() {
           }
           managedCodex = null;
           codexAppPid = null;
+          if (options.exitOnCodexExit) {
+            stopAfterManagedCodexExit();
+            break;
+          }
           idleAfterNormalExit = true;
           console.error(
             "Waiting for Codex after exit; open Codex Taskboard again to restart it.",

@@ -7,7 +7,7 @@ const tauriConfig = JSON.parse(await readFile(new URL("../src-tauri/tauri.conf.j
 const releaseWorkflow = await readFile(new URL("../.github/workflows/release-macos.yml", import.meta.url), "utf8");
 const checkWorkflow = await readFile(new URL("../.github/workflows/check.yml", import.meta.url), "utf8");
 
-test("the macOS launcher uses one instance, serialized lifecycle changes, and a loopback CDP port", () => {
+test("the managed macOS launcher uses one instance, strict sidebar injection, and a loopback CDP port", () => {
   assert.match(launcherSource, /libc::flock/);
   assert.match(launcherSource, /lifecycle: Mutex/);
   assert.match(launcherSource, /generation: AtomicU64/);
@@ -16,8 +16,17 @@ test("the macOS launcher uses one instance, serialized lifecycle changes, and a 
   assert.match(launcherSource, /codex_port: Mutex<Option<u16>>/);
   assert.match(
     launcherSource,
-    /#\[cfg\(target_os = "macos"\)\]\s+command\.args\(\["--launch", "--watch", "--open", "--port", &codex_port\]\);/,
+    /#\[cfg\(target_os = "macos"\)\]\s+command\.args\(\[\s*"--launch",\s*"--watch",\s*"--open",\s*"--strict-sidebar",\s*"--exit-on-codex-exit",\s*"--port",\s*&codex_port,\s*\]\);/,
   );
+  assert.match(launcherSource, /set_activation_policy\(ActivationPolicy::Regular\)/);
+  assert.match(launcherSource, /ordinary_codex_processes\(&codex_app, &codex_profile\)/);
+  assert.match(launcherSource, /for codex_pid in ordinary_codex_pids/);
+  assert.match(launcherSource, /normal_codex_exit = matches!/);
+  assert.match(
+    launcherSource,
+    /Codex 已退出，任务面板服务已停止。/,
+  );
+  assert.doesNotMatch(launcherSource, /UPDATE_CHECK_INTERVAL/);
   assert.doesNotMatch(launcherSource, /const LAUNCHER_PORT/);
 });
 
