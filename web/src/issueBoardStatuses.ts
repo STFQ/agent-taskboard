@@ -3,13 +3,13 @@ import type { TaskStatus } from "./types";
 export const MAIN_STATUSES = [
   "todo",
   "in_progress",
-  "blocked",
   "in_review",
+  "done",
 ] as const satisfies readonly TaskStatus[];
 
 export const SECONDARY_STATUSES = [
   "backlog",
-  "done",
+  "blocked",
   "canceled",
 ] as const satisfies readonly TaskStatus[];
 
