@@ -9,7 +9,7 @@ A local-first issue board that runs in a browser and can be embedded in Codex th
 ## Requirements
 
 - Node.js 22.5 or newer
-- macOS App and DMG builds: Xcode Command Line Tools and Rust 1.88 or newer with the `aarch64-apple-darwin` and `x86_64-apple-darwin` targets. `npm install` installs the Tauri CLI used by this project.
+- macOS App and DMG builds: Xcode Command Line Tools and Rust 1.88 or newer. Install only the Rust target that matches the App you are building; install both targets only for a universal release. `npm install` installs the Tauri CLI used by this project.
 - Windows NSIS builds: the Microsoft Store Codex App, Rust 1.88 or newer, and Visual Studio Build Tools with the C++ workload and Windows SDK.
 
 ## Run locally
@@ -102,7 +102,29 @@ For Tauri development, run:
 npm run app:dev
 ```
 
-To build the local App and DMG, install the two Rust targets once, then run the build:
+Choose the macOS target that matches the machine or release artifact you need. Do not use the universal build for a local Apple Silicon-only build.
+
+**Apple Silicon (M1/M2/M3/M4) only**
+
+```bash
+rustup target add aarch64-apple-darwin
+npm run app:prepare -- --target aarch64-apple-darwin
+CI=true npx tauri build --target aarch64-apple-darwin --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
+```
+
+The App is at `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Codex Taskboard.app`; the DMG is in the adjacent `dmg/` directory.
+
+**Intel Mac only**
+
+```bash
+rustup target add x86_64-apple-darwin
+npm run app:prepare -- --target x86_64-apple-darwin
+CI=true npx tauri build --target x86_64-apple-darwin --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
+```
+
+**Universal distribution (Apple Silicon + Intel)**
+
+Use this only when the same DMG must support both Mac architectures:
 
 ```bash
 rustup target add aarch64-apple-darwin x86_64-apple-darwin

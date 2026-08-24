@@ -9,7 +9,7 @@
 ## 系统要求
 
 - Node.js 22.5 或更高版本
-- 构建 macOS App 和 DMG：Xcode Command Line Tools、Rust 1.88 或更高版本，以及 `aarch64-apple-darwin` 和 `x86_64-apple-darwin` target。`npm install` 会安装本项目使用的 Tauri CLI。
+- 构建 macOS App 和 DMG：Xcode Command Line Tools 与 Rust 1.88 或更高版本。只安装与目标 App 架构相符的 Rust target；仅在发布通用包时才安装两个 target。`npm install` 会安装本项目使用的 Tauri CLI。
 - 构建 Windows NSIS：Microsoft Store 版 Codex App、Rust 1.88 或更高版本，以及带 C++ 工作负载和 Windows SDK 的 Visual Studio Build Tools。
 
 ## 本地运行
@@ -102,7 +102,29 @@ CODEX_TASKBOARD_HOST=127.0.0.1 npm run codex
 npm run app:dev
 ```
 
-如需构建本地 App 和 DMG，请先安装两个 Rust target，然后运行构建：
+请按本机或发布目标选择 macOS 架构。若只在 Apple Silicon 本机使用，不要运行通用包构建。
+
+**Apple Silicon（M1/M2/M3/M4）本机构建**
+
+```bash
+rustup target add aarch64-apple-darwin
+npm run app:prepare -- --target aarch64-apple-darwin
+CI=true npx tauri build --target aarch64-apple-darwin --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
+```
+
+App 位于 `src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Codex Taskboard.app`，DMG 位于相邻的 `dmg/` 目录。
+
+**Intel Mac 本机构建**
+
+```bash
+rustup target add x86_64-apple-darwin
+npm run app:prepare -- --target x86_64-apple-darwin
+CI=true npx tauri build --target x86_64-apple-darwin --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
+```
+
+**通用发布包（Apple Silicon + Intel）**
+
+仅在同一份 DMG 需要同时支持两种 Mac 架构时使用：
 
 ```bash
 rustup target add aarch64-apple-darwin x86_64-apple-darwin
