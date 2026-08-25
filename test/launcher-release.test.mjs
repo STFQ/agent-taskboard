@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 const launcherSource = await readFile(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
 const tauriConfig = JSON.parse(await readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
-const releaseWorkflow = await readFile(new URL("../.github/workflows/release-macos.yml", import.meta.url), "utf8");
+const releaseWorkflow = await readFile(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
 const checkWorkflow = await readFile(new URL("../.github/workflows/check.yml", import.meta.url), "utf8");
 
 test("the managed macOS launcher uses one instance, strict sidebar injection, and a loopback CDP port", () => {
@@ -31,14 +31,19 @@ test("the managed macOS launcher uses one instance, strict sidebar injection, an
 });
 
 test("release publishing is version-gated and platform signing status is explicit", () => {
-  assert.match(releaseWorkflow, /workflow_dispatch/);
+  assert.doesNotMatch(releaseWorkflow, /workflow_dispatch/);
   assert.match(releaseWorkflow, /tags: \[\"v\*\.\*\.\*\"\]/);
   assert.match(releaseWorkflow, /git merge-base --is-ancestor/);
   assert.match(releaseWorkflow, /package\.json/);
   assert.match(releaseWorkflow, /Cargo\.toml/);
   assert.match(releaseWorkflow, /tauri\.conf\.json/);
+  assert.match(releaseWorkflow, /package-lock\.json/);
+  assert.match(releaseWorkflow, /Cargo\.lock/);
+  assert.match(releaseWorkflow, /verify-linux-packages\.mjs/);
   assert.match(releaseWorkflow, /SHA256SUMS/);
+  assert.match(releaseWorkflow, /SHA256SUMS-windows/);
   assert.match(releaseWorkflow, /unsigned preview/);
+  assert.match(releaseWorkflow, /permissions:[\s\S]*contents: read[\s\S]*contents: write/);
   assert.match(checkWorkflow, /npm run typecheck/);
   assert.match(checkWorkflow, /npm run build:web/);
 });

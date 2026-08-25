@@ -3,15 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*.*.*"]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing vX.Y.Z tag to build
-        required: true
-        type: string
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref_name }}
@@ -27,12 +21,12 @@ jobs:
           persist-credentials: false
       - name: Validate version and tag
         env:
-          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           test "${RELEASE_TAG#v}" != "${RELEASE_TAG}"
           test "${RELEASE_TAG}" = "v$(node -p "require('./package.json').version")"
-          node -e 'const fs=require("fs"); const cargo=fs.readFileSync("src-tauri/Cargo.toml","utf8"); const tauri=require("./src-tauri/tauri.conf.json"); const pkg=require("./package.json"); if (!cargo.includes(`version = "${pkg.version}"`) || tauri.version !== pkg.version) process.exit(1)'
+          node -e 'const fs=require("fs"); const cargo=fs.readFileSync("src-tauri/Cargo.toml","utf8"); const cargoLock=fs.readFileSync("src-tauri/Cargo.lock","utf8"); const lock=require("./package-lock.json"); const tauri=require("./src-tauri/tauri.conf.json"); const pkg=require("./package.json"); const root=lock.packages?.[""]; if (root?.name !== pkg.name || root?.version !== pkg.version || !cargo.includes(`version = "${pkg.version}"`) || !cargoLock.includes(`name = "agent-taskboard-launcher"\\nversion = "${pkg.version}"`) || tauri.version !== pkg.version) process.exit(1)'
           git fetch --no-tags origin main
           git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
 
@@ -50,13 +44,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential file libayatana-appindicator3-dev librsvg2-dev libssl-dev libwebkit2gtk-4.1-dev libxdo-dev patchelf wget
       - run: npm ci
       - run: npm run app:build:linux:x64
+      - name: Verify Linux package contents
+        run: |
+          set -euo pipefail
+          DEB="$(find src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          APPIMAGE="$(find src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage -maxdepth 1 -type f -name '*.AppImage' -print -quit)"
+          test -n "$DEB" && test -n "$APPIMAGE"
+          node scripts/verify-linux-packages.mjs "$DEB" "$APPIMAGE"
       - name: Stage stable Linux assets and checksums
         run: |
           set -euo pipefail
           mkdir -p release
           cp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb release/Agent.Taskboard_${{ github.ref_name }}_Ubuntu-24.04-x64.deb
           cp src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage release/Agent.Taskboard_${{ github.ref_name }}_Ubuntu-24.04-x64.AppImage
-          (cd release && shasum -a 256 * > SHA256SUMS)
+          (cd release && sha256sum * > SHA256SUMS)
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with: { name: linux-stable, path: release/ }
 
@@ -72,12 +73,24 @@ jobs:
         with: { targets: x86_64-pc-windows-msvc }
       - run: npm ci
       - run: npm run app:build:windows
+      - name: Stage Windows preview and checksum
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          $installer = Get-ChildItem 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe' | Select-Object -First 1
+          if (-not $installer) { throw 'Windows installer was not produced' }
+          $name = "Agent.Taskboard_$($env:GITHUB_REF_NAME)_Windows-x64-preview-setup.exe"
+          Copy-Item $installer.FullName "release/$name"
+          $hash = (Get-FileHash "release/$name" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $name" | Set-Content -NoNewline 'release/SHA256SUMS-windows'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with: { name: windows-preview, path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*-setup.exe }
+        with: { name: windows-preview, path: release/ }
 
   publish:
     needs: [build-linux, build-windows-preview]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.0
         with: { path: release-assets, merge-multiple: true }
@@ -86,7 +99,7 @@ jobs:
           cat > release-notes.md <<'EOF'
           ## Agent Taskboard ${{ github.ref_name }}
 
-          Linux x64 packages are the stable target. Windows x64 is an unsigned preview. macOS is not published by this workflow until a Developer ID certificate is configured. SHA256 checksums are included in `SHA256SUMS`.
+          Linux x64 packages are the stable target. Windows x64 is an unsigned preview. macOS is not published by this workflow until a Developer ID certificate is configured. SHA256 checksums are included in `SHA256SUMS` and `SHA256SUMS-windows`.
 
           Agent Taskboard is independent and not affiliated with or endorsed by OpenAI.
           EOF
