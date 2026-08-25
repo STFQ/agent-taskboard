@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
           test "${RELEASE_TAG#v}" != "${RELEASE_TAG}"
           test "${RELEASE_TAG}" = "v$(node -p "require('./package.json').version")"
-          node -e 'const fs=require("fs"); const cargo=fs.readFileSync("src-tauri/Cargo.toml","utf8"); const cargoLock=fs.readFileSync("src-tauri/Cargo.lock","utf8"); const lock=require("./package-lock.json"); const tauri=require("./src-tauri/tauri.conf.json"); const pkg=require("./package.json"); const root=lock.packages?.[""]; if (root?.name !== pkg.name || root?.version !== pkg.version || !cargo.includes(`version = "${pkg.version}"`) || !cargoLock.includes(`name = "agent-taskboard-launcher"\\nversion = "${pkg.version}"`) || tauri.version !== pkg.version) process.exit(1)'
+          node -e 'const fs=require("fs"); const cargo=fs.readFileSync("src-tauri/Cargo.toml","utf8"); const cargoLock=fs.readFileSync("src-tauri/Cargo.lock","utf8"); const lock=require("./package-lock.json"); const tauri=require("./src-tauri/tauri.conf.json"); const pkg=require("./package.json"); const root=lock.packages?.[""]; if (root?.name !== pkg.name || root?.version !== pkg.version || !cargo.includes(`version = "${pkg.version}"`) || !cargoLock.includes(`name = "agent-taskboard-launcher"\nversion = "${pkg.version}"`) || tauri.version !== pkg.version) process.exit(1)'
           git fetch --no-tags origin main
           git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
 
