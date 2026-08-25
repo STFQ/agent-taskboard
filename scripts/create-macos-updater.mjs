@@ -36,11 +36,11 @@ run("/usr/bin/tar", ["-czf", artifactPath, path.basename(appPath)], {
 run(path.join(projectRoot, "node_modules", ".bin", "tauri"), ["signer", "sign", artifactPath]);
 
 const signature = await readFile(`${artifactPath}.sig`, "utf8");
-const downloadUrl = `https://github.com/chuspeeism/dashi-taskboard/releases/download/${releaseTag}/${artifactName}`;
+const downloadUrl = `https://github.com/STFQ/agent-taskboard/releases/download/${releaseTag}/${artifactName}`;
 const platform = { signature, url: downloadUrl };
 const latest = {
   version: packageJson.version,
-  notes: `Codex Taskboard ${packageJson.version}`,
+  notes: `Agent Taskboard ${packageJson.version}`,
   pub_date: new Date().toISOString(),
   platforms: {
     "darwin-aarch64": platform,

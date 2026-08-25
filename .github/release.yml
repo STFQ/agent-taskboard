@@ -1,0 +1,16 @@
+changelog:
+  categories:
+    - title: User-facing changes
+      labels:
+        - "feature"
+        - "enhancement"
+    - title: Fixes
+      labels:
+        - "bug"
+    - title: Maintenance
+      labels:
+        - "dependencies"
+        - "documentation"
+    - title: Other
+      labels:
+        - "*"

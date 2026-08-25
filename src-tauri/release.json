@@ -1,4 +1,4 @@
 {
-  "appleTeamId": "Q6HZ9PD6YB",
-  "nodeTeamId": "HX7739G8FX"
+  "signingStatus": "disabled",
+  "reason": "No Developer ID certificate or Apple Team ID is configured for this independent distribution."
 }

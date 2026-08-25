@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible problem in Agent Taskboard
+title: "bug: "
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version and platform
+      placeholder: v2.0.0, Ubuntu 24.04 x64
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the smallest safe reproduction. Remove credentials and private task data.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact tokens, cookies, paths, and private content.

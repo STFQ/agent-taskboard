@@ -7,12 +7,12 @@ export const inject = ["webServer"];
 
 const ROUTE = "/integrations/codex-taskboard";
 const RUNTIME_FILE = process.env.CODEX_TASKBOARD_RUNTIME_FILE
-  ?? path.join(os.homedir(), "Library/Application Support/Codex Taskboard/launcher-runtime.json");
+  ?? path.join(os.homedir(), "Library/Application Support/Agent Taskboard/launcher-runtime.json");
 
 async function activeTaskboardUrl() {
   const descriptor = JSON.parse(await readFile(RUNTIME_FILE, "utf8"));
   if (descriptor?.version !== 1 || typeof descriptor.url !== "string") {
-    throw new Error("The active Codex Taskboard runtime is invalid");
+    throw new Error("The active Agent Taskboard runtime is invalid");
   }
   const url = new URL(`${descriptor.url.replace(/\/$/, "")}/`);
   url.searchParams.set("host", "deepseek-harness");
@@ -36,7 +36,7 @@ export function apply(ctx) {
             "content-type": "text/plain; charset=utf-8",
             "cache-control": "no-store",
           });
-          response.end("Codex Taskboard is not running.");
+          response.end("Agent Taskboard is not running.");
         }
       },
     }),

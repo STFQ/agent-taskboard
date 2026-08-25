@@ -125,7 +125,7 @@ export class CodexAppServer {
         this.#sendRequest("initialize", {
           clientInfo: {
             name: "codex-taskboard",
-            title: "Codex Taskboard",
+            title: "Agent Taskboard",
             version: "1.0.1",
           },
           capabilities: {

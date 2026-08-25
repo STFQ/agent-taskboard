@@ -17,10 +17,10 @@ const sourceRef = process.env.TASKBOARD_INJECTION_SOURCE_REF;
 const source = sourceRef
   ? (await execFileAsync(
       "git",
-      ["show", `${sourceRef}:inject/codex-taskboard.user.js`],
+      ["show", `${sourceRef}:inject/agent-taskboard.user.js`],
       { cwd: projectRoot, maxBuffer: 2 * 1024 * 1024 },
     )).stdout
-  : await readFile(new URL("../inject/codex-taskboard.user.js", import.meta.url), "utf8");
+  : await readFile(new URL("../inject/agent-taskboard.user.js", import.meta.url), "utf8");
 const embeddedHostSource = await readFile(
   new URL("../web/src/embeddedHost.mjs", import.meta.url),
   "utf8",

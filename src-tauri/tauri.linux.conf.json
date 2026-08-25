@@ -3,7 +3,7 @@
   "bundle": {
     "targets": ["deb", "appimage"],
     "createUpdaterArtifacts": false,
-    "externalBin": ["binaries/codex-taskboard-node"],
+    "externalBin": ["binaries/agent-taskboard-node"],
     "icon": ["../web/public/codex-app-icon.png"]
   }
 }

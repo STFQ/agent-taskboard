@@ -108,7 +108,7 @@ window.__ModuleLoader__.load({
           key: generation,
           className: "dsh-codex-taskboard-frame",
           src: `${ROUTE}?refresh=${generation}`,
-          title: "Codex Taskboard",
+          title: "Agent Taskboard",
         }),
       );
     }

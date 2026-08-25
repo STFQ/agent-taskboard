@@ -89,7 +89,7 @@ async function manifest(root, relative = "") {
 }
 
 verifyNode(appPath);
-const launcherPath = path.join(appPath, "Contents", "MacOS", "codex-taskboard-launcher");
+const launcherPath = path.join(appPath, "Contents", "MacOS", "agent-taskboard-launcher");
 for (const targetPath of [launcherPath, appPath]) {
   run("/usr/bin/codesign", [
     "--force",

@@ -1,26 +1,21 @@
 # Code signing policy
 
-For official Windows releases after the application is approved: **Free code
-signing provided by [SignPath.io](https://signpath.io/), certificate by
-[SignPath Foundation](https://signpath.org/).** Current Windows
-continuous-integration artifacts remain unsigned until that approval.
+Agent Taskboard currently has no project-owned Developer ID or Windows signing
+credentials. macOS and Windows artifacts are therefore preview builds and
+must not be described as stable signed releases.
 
 ## Scope
 
 This policy applies to official Windows executables and installers published
-by the Codex Taskboard project. Development builds, pull-request artifacts,
+by the Agent Taskboard project. Development builds, pull-request artifacts,
 and local builds are not signed.
 
 ## Team roles
 
-- Authors and committers: [@jadon7](https://github.com/jadon7) and
-  [@chuspeeism](https://github.com/chuspeeism).
-- Reviewers: [@jadon7](https://github.com/jadon7) and
-  [@chuspeeism](https://github.com/chuspeeism). Changes from other
-  contributors are reviewed through pull requests before merge.
-- Approver: repository owner
-  [@chuspeeism](https://github.com/chuspeeism). Every signing request requires
-  manual approval.
+- Maintainer and release approver: the STFQ repository maintainers.
+- Contributors: reviewed through pull requests before merge.
+- A future signing approver must use an individual account with MFA and must
+  be recorded in the release workflow documentation.
 
 ## Build and approval
 
@@ -36,7 +31,7 @@ and local builds are not signed.
 
 ## Privacy
 
-Codex Taskboard's data handling and network activity are documented in the
+Agent Taskboard's data handling and network activity are documented in the
 [Privacy policy](../PRIVACY.md).
 
 ## Incident response

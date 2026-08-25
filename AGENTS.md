@@ -1,5 +1,13 @@
 # Project Development Rules
 
+## Agent Taskboard project entry
+
+Agent Taskboard is an independently maintained, local-first taskboard and CLI for coding-agent workflows. The web entry point is `web/src/main.tsx`; the local API and persistence are in `server/`; the CLI and agent entry points are `cli/taskctl.mjs` and `skills/manage-taskboard/`; the desktop launcher and packaging are in `src-tauri/`. Optional cloud behavior is in `cloud/` and `wrangler.jsonc`.
+
+Safe baseline validation is `npm run typecheck`, `npm run build:web`, and focused `node --test` checks. Do not run a script that opens or attaches to a browser during validation. Local data and logs use the `Agent Taskboard` platform directories; v2 migration is manual and must not delete the previous product's data.
+
+Release gates require package/Cargo/Tauri version consistency, a `vX.Y.Z` tag on `main`, SHA256 checksums, explicit platform and signing status, and release notes. Do not invent Apple Team IDs, certificates, download metrics, security guarantees, or OpenAI affiliation. No change is synchronized back to the former upstream repository; preserve `NOTICE` and `LICENSE` when redistributing.
+
 For feature work in this repository, use this order:
 
 1. Before implementation, prove the real operation path to the user: entry point → user or agent action → data change or other side effect → observable result. Cite the actual component, API, and file involved, or demonstrate the path in the product. This proof is not a test.

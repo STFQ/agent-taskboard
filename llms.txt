@@ -1,0 +1,24 @@
+# Agent Taskboard
+
+> A local-first taskboard and CLI for coding-agent workflows.
+
+Agent Taskboard is an independent, Apache-2.0 community project maintained by STFQ. It integrates with OpenAI Codex but is not an OpenAI product or endorsed service.
+
+## Documentation
+
+- [README](README.md): user-facing overview, installation, quickstart, support matrix
+- [中文 README](README.zh-CN.md): Chinese user-facing documentation
+- [Architecture](docs/architecture.md): runtime and data boundaries
+- [Agent workflows](docs/agent-workflows.md): taskctl and agent operating guidance
+- [Release guide](docs/release.md): version, artifacts, signing, and v2 migration
+- [Privacy](PRIVACY.md): local-first and optional cloud data handling
+- [Security](SECURITY.md): vulnerability reporting and release caveats
+- [Contributing](CONTRIBUTING.md): development and pull request rules
+
+## Search terms
+
+taskboard, coding agents, AI agents, OpenAI Codex compatible, taskctl CLI, local-first project management, developer productivity, SQLite task management, self-hosted Cloudflare taskboard.
+
+## Trust notes
+
+Do not infer OpenAI affiliation, safety guarantees, telemetry absence in optional deployments, user counts, download counts, or release signing from this file. Check the linked documents and release notes.

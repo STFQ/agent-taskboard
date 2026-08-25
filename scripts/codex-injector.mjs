@@ -40,7 +40,7 @@ const independentCodexProfilePath = process.env.CODEX_TASKBOARD_CODEX_PROFILE
 const sourceCodexProfilePath = process.env.CODEX_TASKBOARD_CODEX_SOURCE_PROFILE
   ? path.resolve(process.env.CODEX_TASKBOARD_CODEX_SOURCE_PROFILE)
   : null;
-const injectionPath = path.join(projectRoot, "inject", "codex-taskboard.user.js");
+const injectionPath = path.join(projectRoot, "inject", "agent-taskboard.user.js");
 const taskboardDataDirectory = process.env.CODEX_TASKBOARD_DATA_DIR
   ? path.resolve(process.env.CODEX_TASKBOARD_DATA_DIR)
   : path.join(projectRoot, ".data");
@@ -1829,7 +1829,7 @@ async function publishInjectionScriptIdentifier(cdp, scriptIdentifier) {
 
 async function registerInjectionSource(cdp, source) {
   const registration = await cdp.send("Page.addScriptToEvaluateOnNewDocument", {
-    source: `${source}\n//# sourceURL=codex-taskboard.user.js`,
+    source: `${source}\n//# sourceURL=agent-taskboard.user.js`,
   });
   return registration.identifier;
 }
@@ -2183,7 +2183,7 @@ async function main() {
       const runningCodex = codexAppProcesses(options.appPath);
       if (options.strictSidebar && runningCodex.length > 0) {
         throw new Error(
-          "Codex 已在运行，但没有可用的侧栏注入通道。请通过 Codex Taskboard 重新启动 Codex。",
+          "Codex 已在运行，但没有可用的侧栏注入通道。请通过 Agent Taskboard 重新启动 Codex。",
         );
       }
       let debuggingCodexFound = false;
@@ -2436,7 +2436,7 @@ async function main() {
           }
           idleAfterNormalExit = true;
           console.error(
-            "Waiting for Codex after exit; open Codex Taskboard again to restart it.",
+            "Waiting for Codex after exit; open Agent Taskboard again to restart it.",
           );
           continue;
         }
@@ -2504,7 +2504,7 @@ async function main() {
             }
             idleAfterNormalExit = true;
             console.error(
-              "Waiting for Codex after normal exit; open Codex Taskboard again to restart it.",
+              "Waiting for Codex after normal exit; open Agent Taskboard again to restart it.",
             );
             continue;
           }
@@ -2538,7 +2538,7 @@ async function main() {
               }
               idleAfterNormalExit = true;
               console.error(
-                "Waiting for Codex after normal exit; open Codex Taskboard again to restart it.",
+                "Waiting for Codex after normal exit; open Agent Taskboard again to restart it.",
               );
               continue;
             }
@@ -2559,7 +2559,7 @@ async function main() {
           }
           idleAfterNormalExit = true;
           console.error(
-            "Waiting for Codex after exit; open Codex Taskboard again to restart it.",
+            "Waiting for Codex after exit; open Agent Taskboard again to restart it.",
           );
           continue;
         }

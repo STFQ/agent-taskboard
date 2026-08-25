@@ -106,12 +106,12 @@ test("the automation host request accepts catalog-provided project automation op
   assert.deepEqual(parseTaskboardAutomationHostRequest(remoteRequest), remoteRequest);
   const windowsRemoteRequest = {
     ...remoteRequest,
-    workspacePath: String.raw`C:\Users\admin\Documents\dashi-taskboard`,
+    workspacePath: String.raw`C:\Users\admin\Documents\agent-taskboard`,
     remoteProjects: [{
       codexProjectId: "remote-project-123",
       codexProjectKind: "remote",
       codexHostId: "remote-ssh-discovered:merlin-agent",
-      workspacePath: String.raw`C:\Users\admin\Documents\dashi-taskboard`,
+      workspacePath: String.raw`C:\Users\admin\Documents\agent-taskboard`,
     }],
   };
   assert.deepEqual(
@@ -203,7 +203,7 @@ test("the remote automation prompt keeps taskctl local and delegates work to the
 
 test("the generated automation command uses an argv runtime file instead of an env assignment", () => {
   const previous = process.env.CODEX_TASKBOARD_RUNTIME_FILE;
-  process.env.CODEX_TASKBOARD_RUNTIME_FILE = "/Users/example/Library/Application Support/Codex Taskboard/launcher-runtime.json";
+  process.env.CODEX_TASKBOARD_RUNTIME_FILE = "/Users/example/Library/Application Support/Agent Taskboard/launcher-runtime.json";
   try {
     const prompt = buildTaskboardAutomationPrompt(baseRequest);
     const cliPath = path.resolve(path.dirname(baseRequest.skillPath), "../..", "cli/taskctl.mjs");

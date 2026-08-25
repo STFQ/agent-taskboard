@@ -1,6 +1,6 @@
 # Managed Sidebar Launcher V1
 
-This local build treats the Codex Taskboard launcher as the only supported
+This local build treats the Agent Taskboard launcher as the only supported
 entry point for the sidebar view.
 
 ## Lifecycle contract

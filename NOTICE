@@ -1,0 +1,8 @@
+Agent Taskboard
+Copyright 2026 STFQ and contributors
+
+This project is independently maintained by STFQ and is not affiliated with or endorsed by OpenAI or the former upstream project.
+
+The initial code baseline was derived from chuspeeism/dashi-taskboard at commit c9041ec, under the Apache License 2.0. Agent Taskboard has since diverged as an independently maintained branch. Preserve this notice and the accompanying LICENSE when redistributing the project.
+
+The exact historical provenance statement is provided for attribution; it does not imply ongoing synchronization, endorsement, or a support relationship.

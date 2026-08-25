@@ -55,14 +55,14 @@ async function assertElfX64(filePath) {
 }
 
 async function verifyPackageRoot(root, label) {
-  const launcherPath = path.join(root, "usr", "bin", "codex-taskboard-launcher");
-  const nodePath = path.join(root, "usr", "bin", "codex-taskboard-node");
-  const resourceRoot = path.join(root, "usr", "lib", "Codex Taskboard");
+  const launcherPath = path.join(root, "usr", "bin", "agent-taskboard-launcher");
+  const nodePath = path.join(root, "usr", "bin", "agent-taskboard-node");
+  const resourceRoot = path.join(root, "usr", "lib", "Agent Taskboard");
   const taskctlPath = path.join(resourceRoot, "bin", "taskctl");
   const requiredResources = [
     "app/cli/taskctl.mjs",
     "app/dist/web/index.html",
-    "app/inject/codex-taskboard.user.js",
+    "app/inject/agent-taskboard.user.js",
     "app/node_modules/smol-toml/package.json",
     "app/scripts/codex-injector.mjs",
     "app/server/app.mjs",
@@ -83,7 +83,7 @@ async function verifyPackageRoot(root, label) {
 
   const wrapper = await readFile(taskctlPath, "utf8");
   if (
-    !wrapper.includes("codex-taskboard-node")
+    !wrapper.includes("agent-taskboard-node")
     || !wrapper.includes("app/cli/taskctl.mjs")
   ) {
     throw new Error(`${label} taskctl does not use the packaged Node and CLI`);

@@ -30,19 +30,17 @@ test("the managed macOS launcher uses one instance, strict sidebar injection, an
   assert.doesNotMatch(launcherSource, /const LAUNCHER_PORT/);
 });
 
-test("release signing is tag-only and PR CI builds the real unsigned app bundle", () => {
-  assert.doesNotMatch(releaseWorkflow, /workflow_dispatch/);
+test("release publishing is version-gated and platform signing status is explicit", () => {
+  assert.match(releaseWorkflow, /workflow_dispatch/);
+  assert.match(releaseWorkflow, /tags: \[\"v\*\.\*\.\*\"\]/);
   assert.match(releaseWorkflow, /git merge-base --is-ancestor/);
   assert.match(releaseWorkflow, /package\.json/);
   assert.match(releaseWorkflow, /Cargo\.toml/);
   assert.match(releaseWorkflow, /tauri\.conf\.json/);
-  assert.match(releaseWorkflow, /TAG_FORCED/);
-  assert.match(releaseWorkflow, /sign-macos-app\.mjs/);
-  assert.match(releaseWorkflow, /notarytool submit/);
-  assert.match(releaseWorkflow, /stapler validate/);
-  assert.match(checkWorkflow, /tauri -- build/);
-  assert.match(checkWorkflow, /--bundles app/);
-  assert.match(checkWorkflow, /--no-sign/);
+  assert.match(releaseWorkflow, /SHA256SUMS/);
+  assert.match(releaseWorkflow, /unsigned preview/);
+  assert.match(checkWorkflow, /npm run typecheck/);
+  assert.match(checkWorkflow, /npm run build:web/);
 });
 
 test("Windows CI runs the Node suite and the unsigned launcher skips unsupported updates", () => {
