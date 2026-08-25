@@ -9,7 +9,7 @@ rust-version = "1.88"
 tauri-build = { version = "2.6.0", features = [] }
 
 [dependencies]
-base64 = "0.22"
+base64 = "0.23"
 futures-util = "0.3"
 libc = "0.2"
 minisign-verify = "0.2"
