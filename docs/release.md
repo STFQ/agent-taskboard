@@ -10,6 +10,7 @@ v2 uses the Agent Taskboard product name, bundle identifier, release endpoints, 
 
 - v2.0.0 publishes no Windows, macOS, or Linux installer and no platform binary asset.
 - GitHub's automatically generated source ZIP and tarball are the only release artifacts.
+- “Source-only” describes GitHub Release assets, not the supported ways to use the project. The local server, Codex integration, `taskctl`, macOS `.app`, Ubuntu `.deb`/AppImage, Windows NSIS installer, and Cloudflare deployment remain available from source. DMG creation and distribution are intentionally excluded.
 - Future installer publishing requires a separate decision covering reproducible packaging, signing, checksums, platform support, and release verification.
 - Never commit private signing keys. Never invent an Apple Team ID, certificate identity, download count, or security claim.
 
