@@ -278,7 +278,10 @@ function resolvedWorkspace(projectId, project, workspaces) {
   }
   return {
     workspacePath,
-    addDirectories: [...new Set(workspaces.values())].filter((candidate) => candidate !== workspacePath),
+    // Keep each conversation in its selected project. Passing every mapped
+    // workspace makes unrelated repository instructions available to Codex and
+    // needlessly enlarges the prompt context.
+    addDirectories: [],
     project,
   };
 }

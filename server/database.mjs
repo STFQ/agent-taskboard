@@ -377,6 +377,9 @@ function aiChatRunFromRow(row) {
     status: row.status,
     exitCode: row.exit_code,
     error: row.error,
+    inputTokens: row.input_tokens,
+    cachedInputTokens: row.cached_input_tokens,
+    outputTokens: row.output_tokens,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
   };
@@ -395,6 +398,7 @@ function aiChatThreadFromRow(row) {
       ...(row.origin_issue_identifier ? { issueIdentifier: row.origin_issue_identifier } : {}),
     },
     codexThreadId: row.codex_thread_id,
+    contextCompactedAt: row.context_compacted_at,
     model: row.model,
     reasoningEffort: row.reasoning_effort,
     sandbox: row.sandbox,
@@ -587,6 +591,7 @@ export class TaskboardDatabase {
         origin_issue_id TEXT,
         origin_issue_identifier TEXT,
         codex_thread_id TEXT,
+        context_compacted_at TEXT,
         model TEXT NOT NULL,
         reasoning_effort TEXT NOT NULL,
         sandbox TEXT NOT NULL CHECK (sandbox IN (
@@ -607,6 +612,9 @@ export class TaskboardDatabase {
         )),
         exit_code INTEGER,
         error TEXT,
+        input_tokens INTEGER CHECK (input_tokens IS NULL OR input_tokens >= 0),
+        cached_input_tokens INTEGER CHECK (cached_input_tokens IS NULL OR cached_input_tokens >= 0),
+        output_tokens INTEGER CHECK (output_tokens IS NULL OR output_tokens >= 0),
         started_at TEXT NOT NULL,
         finished_at TEXT
       );
@@ -637,6 +645,22 @@ export class TaskboardDatabase {
     const projectColumns = this.database.prepare("PRAGMA table_info(projects)").all();
     if (!projectColumns.some((column) => column.name === "workspace_path")) {
       this.database.exec("ALTER TABLE projects ADD COLUMN workspace_path TEXT");
+    }
+
+    const aiChatThreadColumns = this.database.prepare("PRAGMA table_info(ai_chat_threads)").all();
+    if (!aiChatThreadColumns.some((column) => column.name === "context_compacted_at")) {
+      this.database.exec("ALTER TABLE ai_chat_threads ADD COLUMN context_compacted_at TEXT");
+    }
+
+    const aiChatRunColumns = this.database.prepare("PRAGMA table_info(ai_chat_runs)").all();
+    for (const [column, definition] of [
+      ["input_tokens", "INTEGER"],
+      ["cached_input_tokens", "INTEGER"],
+      ["output_tokens", "INTEGER"],
+    ]) {
+      if (!aiChatRunColumns.some((existing) => existing.name === column)) {
+        this.database.exec(`ALTER TABLE ai_chat_runs ADD COLUMN ${column} ${definition}`);
+      }
     }
 
     const taskColumns = this.database.prepare("PRAGMA table_info(tasks)").all();
@@ -1572,9 +1596,9 @@ export class TaskboardDatabase {
         id, title, status,
         origin_project_id, origin_project_name, origin_workspace_path,
         origin_issue_id, origin_issue_identifier,
-        codex_thread_id, model, reasoning_effort, sandbox,
+        codex_thread_id, context_compacted_at, model, reasoning_effort, sandbox,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.title,
@@ -1585,6 +1609,7 @@ export class TaskboardDatabase {
       input.origin.issueId ?? null,
       input.origin.issueIdentifier ?? null,
       input.codexThreadId ?? null,
+      input.contextCompactedAt ?? null,
       input.model,
       input.reasoningEffort,
       input.sandbox,
@@ -1603,6 +1628,7 @@ export class TaskboardDatabase {
       title: "title",
       status: "status",
       codexThreadId: "codex_thread_id",
+      contextCompactedAt: "context_compacted_at",
       model: "model",
       reasoningEffort: "reasoning_effort",
       sandbox: "sandbox",
@@ -1610,7 +1636,7 @@ export class TaskboardDatabase {
     const assignments = [];
     const values = [];
     for (const [key, column] of Object.entries(columns)) {
-      if (!Object.hasOwn(changes, key)) continue;
+      if (!Object.hasOwn(changes, key) || changes[key] === undefined) continue;
       assignments.push(`${column} = ?`);
       values.push(changes[key]);
     }
@@ -1652,14 +1678,18 @@ export class TaskboardDatabase {
     try {
       this.database.prepare(`
         INSERT INTO ai_chat_runs (
-          id, thread_id, status, exit_code, error, started_at, finished_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+          id, thread_id, status, exit_code, error,
+          input_tokens, cached_input_tokens, output_tokens, started_at, finished_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id,
         input.threadId,
         input.status ?? "running",
         input.exitCode ?? null,
         input.error ?? null,
+        input.inputTokens ?? null,
+        input.cachedInputTokens ?? null,
+        input.outputTokens ?? null,
         timestamp,
         input.finishedAt ?? null,
       );
@@ -1687,12 +1717,15 @@ export class TaskboardDatabase {
       status: "status",
       exitCode: "exit_code",
       error: "error",
+      inputTokens: "input_tokens",
+      cachedInputTokens: "cached_input_tokens",
+      outputTokens: "output_tokens",
       finishedAt: "finished_at",
     };
     const assignments = [];
     const values = [];
     for (const [key, column] of Object.entries(columns)) {
-      if (!Object.hasOwn(changes, key)) continue;
+      if (!Object.hasOwn(changes, key) || changes[key] === undefined) continue;
       assignments.push(`${column} = ?`);
       values.push(changes[key]);
     }

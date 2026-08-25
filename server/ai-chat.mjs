@@ -20,6 +20,8 @@ import {
 
 const SANDBOXES = new Set(["read-only", "workspace-write", "danger-full-access"]);
 const ERROR_CONTENT_LIMIT = 65_536;
+const MAX_TURN_MESSAGE_CHARS = 24_000;
+const DEFAULT_CONTEXT_TOKEN_LIMIT = 120_000;
 const AGENT_DISPATCH_PROTOCOL = "taskboard.agent.v1";
 const CODEX_IMAGE_TYPES = new Set([
   "image/gif",
@@ -31,6 +33,21 @@ const CODEX_IMAGE_TYPES = new Set([
 function cappedError(value) {
   const message = value instanceof Error ? value.message : String(value ?? "");
   return message.slice(0, ERROR_CONTENT_LIMIT);
+}
+
+function tokenUsage(usage) {
+  if (!usage || typeof usage !== "object") return null;
+  const read = (snakeCase, camelCase) => {
+    const value = usage[snakeCase] ?? usage[camelCase];
+    return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+  };
+  const inputTokens = read("input_tokens", "inputTokens");
+  const cachedInputTokens = read("cached_input_tokens", "cachedInputTokens");
+  const outputTokens = read("output_tokens", "outputTokens");
+  if (inputTokens === undefined && cachedInputTokens === undefined && outputTokens === undefined) {
+    return null;
+  }
+  return { inputTokens, cachedInputTokens, outputTokens };
 }
 
 function agentDispatchText(agent) {
@@ -125,16 +142,22 @@ export class AiChatService {
   constructor(options) {
     this.database = options.database;
     this.codexExecutable = options.codexExecutable;
+    this.codexHome = options.codexHome;
     this.codexStatePath = options.codexStatePath;
     this.manageTaskboardSkillPath = options.manageTaskboardSkillPath;
-    this.processEnv = options.processEnv ?? process.env;
+    const processEnv = options.processEnv ?? process.env;
+    this.processEnv = this.codexHome
+      ? { ...processEnv, CODEX_HOME: this.codexHome }
+      : processEnv;
     this.killGraceMs = options.killGraceMs ?? 1_000;
+    this.contextTokenLimit = options.contextTokenLimit ?? DEFAULT_CONTEXT_TOKEN_LIMIT;
     this.appServer = options.appServer ?? new CodexAppServer({
       executable: this.codexExecutable,
       processEnv: this.processEnv,
     });
     this.composerCatalog = options.composerCatalog ?? new ComposerCatalog({
       appServer: this.appServer,
+      codexHome: this.codexHome,
       issueSlashCommands: () => loadSlashCommands(),
     });
     this.resolveContext = options.resolveContext ?? (async (projectId, issueId) => {
@@ -290,7 +313,9 @@ export class AiChatService {
       throw new ApiError(409, "AI_CHAT_THREAD_NOT_STARTED", "Conversation has not started");
     }
     await this.appServer.compactThread(thread.codexThreadId);
-    return this.getThread(threadId);
+    return this.database.updateAiChatThread(threadId, {
+      contextCompactedAt: new Date().toISOString(),
+    });
   }
 
   async createThread(input) {
@@ -369,6 +394,7 @@ export class AiChatService {
       return this.#startComposerTurn(thread, input);
     }
     this.#validateTurnInput(input);
+    this.#assertContextWithinBudget(thread);
     if (thread.sandbox === "danger-full-access" && input.dangerFullAccessConfirmed !== true) {
       throw new ApiError(
         400,
@@ -435,6 +461,7 @@ export class AiChatService {
           message: input.message,
           skills: selectedSkills,
           attachmentPaths,
+          taskboardIntent: input.taskboardIntent,
         },
         this.manageTaskboardSkillPath,
       );
@@ -442,6 +469,9 @@ export class AiChatService {
       this.#emit(threadId, { type: "ai.run", run });
       const userEventData = {};
       if (skillIds.length > 0) userEventData.skillIds = skillIds;
+      if (input.taskboardIntent && input.taskboardIntent !== "none") {
+        userEventData.taskboardIntent = input.taskboardIntent;
+      }
       if (attachments.length > 0) {
         userEventData.attachments = attachments.map(({ filename, contentType, size }) => ({
           filename,
@@ -491,6 +521,14 @@ export class AiChatService {
             content: normalized.content,
             data: normalized.data,
           });
+          if (normalized.data?.usage) {
+            const updatedRun = this.database.updateAiChatRun(run.id, {
+              inputTokens: normalized.data.usage.input_tokens,
+              cachedInputTokens: normalized.data.usage.cached_input_tokens,
+              outputTokens: normalized.data.usage.output_tokens,
+            });
+            this.#emit(threadId, { type: "ai.run", run: updatedRun });
+          }
           if (raw.type === "turn.completed" && terminalOutcome === null) {
             terminalOutcome = "completed";
           } else if (raw.type === "turn.failed") {
@@ -668,7 +706,7 @@ export class AiChatService {
     if (
       !input
       || typeof input.message !== "string"
-      || input.message.length > 100_000
+      || input.message.length > MAX_TURN_MESSAGE_CHARS
       || (
         input.message.trim() === ""
         && (!Array.isArray(input.attachments) || input.attachments.length === 0)
@@ -677,7 +715,7 @@ export class AiChatService {
       throw new ApiError(
         400,
         "INVALID_MESSAGE",
-        "A message or at least one attachment is required",
+        `A message (up to ${MAX_TURN_MESSAGE_CHARS} characters) or at least one attachment is required`,
       );
     }
     if (
@@ -694,9 +732,33 @@ export class AiChatService {
         "'skillIds' must contain at most 20 skill ids",
       );
     }
+    if (input.taskboardIntent !== undefined && !["none", "read", "mutate"].includes(input.taskboardIntent)) {
+      throw new ApiError(
+        400,
+        "INVALID_TASKBOARD_INTENT",
+        "'taskboardIntent' must be none, read, or mutate",
+      );
+    }
+  }
+
+  #assertContextWithinBudget(thread) {
+    if (!thread.codexThreadId) return;
+    const runs = this.database.listAiChatRuns(thread.id);
+    const latestMeasuredRun = [...runs].reverse().find((run) => (
+      run.status === "completed" && Number.isSafeInteger(run.inputTokens)
+      && (!thread.contextCompactedAt || run.finishedAt > thread.contextCompactedAt)
+    ));
+    if (!latestMeasuredRun || latestMeasuredRun.inputTokens < this.contextTokenLimit) return;
+    throw new ApiError(
+      409,
+      "AI_CHAT_CONTEXT_BUDGET_EXCEEDED",
+      `This conversation reached its ${this.contextTokenLimit.toLocaleString("en-US")}-token context budget. Compact it or start a new conversation.`,
+      { inputTokens: latestMeasuredRun.inputTokens, contextTokenLimit: this.contextTokenLimit },
+    );
   }
 
   async #startComposerTurn(thread, input) {
+    this.#assertContextWithinBudget(thread);
     if (thread.sandbox === "danger-full-access" && input.dangerFullAccessConfirmed !== true) {
       throw new ApiError(
         400,
@@ -897,6 +959,11 @@ export class AiChatService {
       return;
     }
     if (notification.method !== "turn/completed") return;
+    const usage = tokenUsage(params.turn?.usage);
+    if (usage) {
+      const run = this.database.updateAiChatRun(active.run.id, usage);
+      this.#emit(active.threadId, { type: "ai.run", run });
+    }
     const status = params.turn?.status;
     if (active.interrupted || status === "interrupted") {
       void this.#finishAppServerRun(active, "interrupted");

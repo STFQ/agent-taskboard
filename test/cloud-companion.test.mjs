@@ -8,6 +8,7 @@ import { WebSocket, WebSocketServer } from "ws";
 
 import { main } from "../cli/taskctl.mjs";
 import { createTaskboardServer } from "../server/index.mjs";
+import { createIsolatedCodexRuntime } from "./helpers/isolated-codex-runtime.mjs";
 
 const temporaryDirectories = [];
 
@@ -34,13 +35,19 @@ function jsonResponse(payload, status = 200) {
 }
 
 async function runCli(argv, overrides = {}) {
+  const { env = {}, ...rest } = overrides;
   const stdout = capture();
   const stderr = capture();
   const exitCode = await main(argv, {
     stdout: stdout.stream,
     stderr: stderr.stream,
-    env: {},
-    ...overrides,
+    env,
+    readRuntimeFile: async () => {
+      const error = new Error("No isolated launcher runtime descriptor");
+      error.code = "ENOENT";
+      throw error;
+    },
+    ...rest,
   });
   return { exitCode, stdout, stderr };
 }
@@ -680,7 +687,8 @@ test("cloud mode exposes machine capabilities only to loopback while local mode 
     t.skip("No non-loopback IPv4 interface is available");
     return;
   }
-  const directory = await mkdtemp(path.join(os.tmpdir(), "taskboard-cloud-lan-"));
+  const runtime = await createIsolatedCodexRuntime("taskboard-cloud-lan-");
+  const directory = runtime.directory;
   temporaryDirectories.push(directory);
   const configPath = path.join(directory, "companion.json");
   const { createCloudConfigStore } = await importCloudConfig();
@@ -691,14 +699,13 @@ test("cloud mode exposes machine capabilities only to loopback while local mode 
     sharedKey: "two-person-shared-key",
   });
   let upstreamCalls = 0;
-  const app = createTaskboardServer({
-    dataDirectory: directory,
+  const app = createTaskboardServer(runtime.serverOptions({
     cloudConfigPath: configPath,
     remoteFetch: async () => {
       upstreamCalls += 1;
       return jsonResponse({ projects: [] });
     },
-  });
+  }));
   const address = await app.listen({ host: "0.0.0.0", port: 0 });
   const lanBaseUrl = `http://${lanAddress}:${address.port}`;
 
@@ -841,7 +848,7 @@ test("taskctl companion-control commands use the tokenized launcher runtime endp
   const instanceToken = "7a6f8d37-78ce-46c9-87a8-08e10db88da2";
   const overrides = {
     env: { CODEX_TASKBOARD_RUNTIME_FILE: runtimeFile },
-    readFile: async (filePath) => {
+    readRuntimeFile: async (filePath) => {
       assert.equal(filePath, runtimeFile);
       return JSON.stringify({
         version: 1,

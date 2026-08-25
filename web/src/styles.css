@@ -7664,6 +7664,19 @@ kbd {
   color: var(--text-primary);
 }
 
+.ai-chat-taskboard-menu-wrap .ai-chat-config-menu {
+  width: 270px;
+}
+
+.ai-chat-taskboard-menu-wrap .ai-chat-config-menu > button {
+  grid-template-columns: minmax(0, 1fr) 16px;
+}
+
+.ai-chat-taskboard-menu-wrap .ai-chat-config-menu strong,
+.ai-chat-taskboard-menu-wrap .ai-chat-config-menu small {
+  display: block;
+}
+
 .ai-chat-menu-wrap > button > span {
   overflow: hidden;
   text-overflow: ellipsis;

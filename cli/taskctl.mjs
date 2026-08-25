@@ -1203,9 +1203,7 @@ async function resolveTaskboardBaseUrl(env, overrides) {
   const descriptorPath = configuredDescriptorPath ?? sourceRuntimeFile;
   let descriptor;
   try {
-    const read = configuredDescriptorPath === undefined
-      ? readFile
-      : (overrides.readFile ?? readFile);
+    const read = overrides.readRuntimeFile ?? readFile;
     descriptor = JSON.parse(await read(descriptorPath, "utf8"));
   } catch (error) {
     if (configuredDescriptorPath === undefined && error?.code === "ENOENT") {

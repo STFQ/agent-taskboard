@@ -220,7 +220,7 @@ export function buildCodexArgs(thread, addDirectories, imagePaths = []) {
   return args;
 }
 
-export function buildCodexPrompt(thread, { message, skills, attachmentPaths }, skillPath) {
+export function buildCodexPrompt(thread, { message, skills, attachmentPaths, taskboardIntent }, skillPath) {
   const selectedSkills = skills ?? [];
   const turnAttachmentPaths = attachmentPaths ?? [];
   let selectedSkillIndex = 0;
@@ -248,8 +248,9 @@ export function buildCodexPrompt(thread, { message, skills, attachmentPaths }, s
   );
 
   return [
-    `[$manage-taskboard](${skillPath}) e-taskboard`,
-    "",
+    ...(taskboardIntent === "read" || taskboardIntent === "mutate"
+      ? [`[$manage-taskboard](${skillPath}) e-taskboard`, ""]
+      : []),
     "<taskboard_context>",
     ...context,
     "</taskboard_context>",
@@ -288,7 +289,9 @@ export function normalizeCodexEvent(raw) {
   if (raw.type === "turn.completed") {
     const usage = {};
     for (const key of ["input_tokens", "cached_input_tokens", "output_tokens"]) {
-      if (Number.isFinite(raw.usage?.[key])) usage[key] = raw.usage[key];
+      if (Number.isSafeInteger(raw.usage?.[key]) && raw.usage[key] >= 0) {
+        usage[key] = raw.usage[key];
+      }
     }
     return {
       kind: "event",

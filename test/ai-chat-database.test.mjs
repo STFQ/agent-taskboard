@@ -1,22 +1,21 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import { TaskboardDatabase } from "../server/database.mjs";
+import { createIsolatedCodexRuntime } from "./helpers/isolated-codex-runtime.mjs";
 
 async function createFixture() {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "taskboard-ai-database-"));
-  const filename = path.join(directory, "taskboard.sqlite");
+  const runtime = await createIsolatedCodexRuntime("taskboard-ai-database-");
+  const filename = path.join(runtime.dataDirectory, "taskboard.sqlite");
   const database = new TaskboardDatabase(filename);
   return {
     database,
-    directory,
     filename,
+    runtime,
     async close() {
       this.database.close();
-      await rm(directory, { recursive: true, force: true });
+      await runtime.close();
     },
   };
 }
@@ -47,6 +46,9 @@ test("AI chat persistence stores threads, runs, and visible events without hidde
       id: "run-1",
       threadId: thread.id,
       status: "running",
+      inputTokens: 123,
+      cachedInputTokens: 100,
+      outputTokens: 23,
     });
     fixture.database.insertAiChatEvent({
       id: "event-1",
@@ -68,6 +70,10 @@ test("AI chat persistence stores threads, runs, and visible events without hidde
       "Visible answer",
     ]);
     assert.equal(fixture.database.listAiChatRuns(thread.id)[0].status, "running");
+    const persistedRun = fixture.database.listAiChatRuns(thread.id)[0];
+    assert.equal(persistedRun.inputTokens, 123);
+    assert.equal(persistedRun.cachedInputTokens, 100);
+    assert.equal(persistedRun.outputTokens, 23);
 
     for (const table of ["ai_chat_threads", "ai_chat_runs", "ai_chat_events"]) {
       const columns = fixture.database.database.prepare(`PRAGMA table_info(${table})`).all();

@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
-import { chmod, mkdtemp, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import { createTaskboardServer } from "../server/index.mjs";
+import { createIsolatedCodexRuntime } from "./helpers/isolated-codex-runtime.mjs";
 
 async function createServerFixture(host = "127.0.0.1") {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "taskboard-ai-server-"));
+  const runtime = await createIsolatedCodexRuntime("taskboard-ai-server-");
+  const directory = runtime.directory;
   const workspacePath = path.join(directory, "workspace");
   await mkdir(workspacePath);
   const workspace = await realpath(workspacePath);
@@ -36,25 +38,25 @@ if (args[0] === "debug") {
 }
 `);
   await chmod(codexExecutable, 0o755);
-  const codexStatePath = path.join(directory, "codex-state.json");
+  const codexStatePath = runtime.codexStatePath;
   await writeFile(codexStatePath, JSON.stringify({
     "local-projects": { local: { rootPaths: [workspace] } },
   }));
-  const app = createTaskboardServer({
-    dataDirectory: directory,
+  const app = createTaskboardServer(runtime.serverOptions({
     codexExecutable,
     codexStatePath,
     skillPath: "/fixture/manage-taskboard/SKILL.md",
-  });
+  }));
   const address = await app.listen({ host, port: 0 });
   return {
     app,
     baseUrl: `http://127.0.0.1:${address.port}`,
     directory,
+    runtime,
     workspace,
     async close() {
       await app.close();
-      await rm(directory, { recursive: true, force: true });
+      await runtime.close();
     },
   };
 }
@@ -228,7 +230,7 @@ test("the local AI project falls back to the Taskboard workspace", async () => {
   const fixture = await createServerFixture();
   try {
     await writeFile(
-      path.join(fixture.directory, "codex-state.json"),
+      fixture.runtime.codexStatePath,
       JSON.stringify({ "local-projects": {} }),
     );
 

@@ -112,11 +112,13 @@ export function buildTurnInput(
   skillIds: string[],
   dangerFullAccessConfirmed: boolean,
   attachments: AiChatAttachmentInput[] = [],
+  taskboardIntent: "none" | "read" | "mutate" = "none",
 ) {
   return {
     message,
     ...(skillIds.length > 0 ? { skillIds } : {}),
     ...(attachments.length > 0 ? { attachments } : {}),
+    ...(taskboardIntent !== "none" ? { taskboardIntent } : {}),
     ...(dangerFullAccessConfirmed ? { dangerFullAccessConfirmed: true } : {}),
   };
 }

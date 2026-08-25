@@ -275,6 +275,9 @@ export interface AiChatRun {
   status: AiChatRunStatus;
   exitCode?: number | null;
   error?: string | null;
+  inputTokens?: number | null;
+  cachedInputTokens?: number | null;
+  outputTokens?: number | null;
   startedAt?: string;
   finishedAt?: string | null;
 }
@@ -292,6 +295,7 @@ export interface AiChatThread {
   status: AiChatThreadStatus;
   origin: AiChatOrigin;
   codexThreadId: string | null;
+  contextCompactedAt?: string | null;
   model: string;
   reasoningEffort: string;
   sandbox: AiChatSandbox;

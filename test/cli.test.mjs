@@ -20,14 +20,23 @@ function response(payload, status = 200) {
 }
 
 async function run(argv, fetchImplementation, overrides = {}) {
+  const { env = {}, ...rest } = overrides;
+  const processEnv = Object.hasOwn(overrides, "env")
+    ? env
+    : { CODEX_THREAD_ID: "thread-current" };
   const stdout = capture();
   const stderr = capture();
   const exitCode = await main(argv, {
     fetch: fetchImplementation,
     stdout: stdout.stream,
     stderr: stderr.stream,
-    env: { CODEX_THREAD_ID: "thread-current" },
-    ...overrides,
+    env: processEnv,
+    readRuntimeFile: async () => {
+      const error = new Error("No isolated launcher runtime descriptor");
+      error.code = "ENOENT";
+      throw error;
+    },
+    ...rest,
   });
   return {
     exitCode,
@@ -87,7 +96,7 @@ test("--runtime-file reads the launcher endpoint without a leading environment a
     },
     {
       env: {},
-      readFile: async (filePath) => {
+      readRuntimeFile: async (filePath) => {
         assert.equal(filePath, "/tmp/taskboard-runtime.json");
         return JSON.stringify({ version: 1, url: "http://127.0.0.1:51550/token" });
       },

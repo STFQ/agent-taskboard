@@ -17,7 +17,8 @@ import {
   parseComposerReferenceUri,
 } from "../server/composer-reference.mjs";
 import { createTaskboardServer } from "../server/index.mjs";
-import { normalizeCodexEvent } from "../server/ai-chat-process.mjs";
+import { buildCodexPrompt, normalizeCodexEvent } from "../server/ai-chat-process.mjs";
+import { createIsolatedCodexRuntime } from "./helpers/isolated-codex-runtime.mjs";
 
 async function waitFor(predicate, timeout = 4_000) {
   const deadline = Date.now() + timeout;
@@ -352,7 +353,8 @@ test("composer reference URI parser rejects noncanonical and unsupported markers
 });
 
 test("composer rebind HTTP API returns send-ready documents and boundary errors", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "taskboard-composer-rebind-api-"));
+  const runtime = await createIsolatedCodexRuntime("taskboard-composer-rebind-api-");
+  const directory = runtime.directory;
   const executable = path.join(directory, "fake-codex.mjs");
   await writeFile(executable, `#!/usr/bin/env node
 const args = process.argv.slice(2);
@@ -382,11 +384,10 @@ process.stdin.on("data", (chunk) => {
 });
 `);
   await chmod(executable, 0o755);
-  const app = createTaskboardServer({
-    dataDirectory: path.join(directory, "data"),
+  const app = createTaskboardServer(runtime.serverOptions({
     codexExecutable: executable,
     codexStatePath: path.join(directory, "missing-codex-state.json"),
-  });
+  }));
   try {
     const address = await app.listen({ host: "127.0.0.1", port: 0 });
     const baseUrl = `http://127.0.0.1:${address.port}`;
@@ -633,7 +634,7 @@ process.stdin.on("data", (chunk) => {
     );
   } finally {
     await app.close();
-    await rm(directory, { recursive: true, force: true });
+    await runtime.close();
   }
 });
 
@@ -707,7 +708,8 @@ test("unsupported composer nodes fail with the stable code before a run starts",
 });
 
 async function createFixture() {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "taskboard-ai-runner-"));
+  const runtime = await createIsolatedCodexRuntime("taskboard-ai-runner-");
+  const directory = runtime.directory;
   const workspacePath = path.join(directory, "workspace");
   const otherWorkspacePath = path.join(directory, "other-workspace");
   await Promise.all([mkdir(workspacePath), mkdir(otherWorkspacePath)]);
@@ -727,6 +729,7 @@ const args = process.argv.slice(2);
 if (process.env.FAKE_ENVIRONMENT_CAPTURE_PATH) {
   appendFileSync(process.env.FAKE_ENVIRONMENT_CAPTURE_PATH, JSON.stringify({
     args,
+    codexHome: process.env.CODEX_HOME,
     launcherKeys: Object.keys(process.env).filter((name) => name.startsWith("CODEX_TASKBOARD_")),
   }) + "\\n");
 }
@@ -814,7 +817,7 @@ if (args[0] === "app-server") {
 `);
   await chmod(executable, 0o755);
 
-  const codexStatePath = path.join(directory, "codex-state.json");
+  const codexStatePath = runtime.codexStatePath;
   await writeFile(codexStatePath, JSON.stringify({
     "local-projects": {
       project: { rootPaths: [workspace] },
@@ -828,10 +831,11 @@ if (args[0] === "app-server") {
   const service = new AiChatService({
     database,
     codexExecutable: executable,
+    codexHome: runtime.codexHome,
     codexStatePath,
     manageTaskboardSkillPath: "/fixture/manage-taskboard/SKILL.md",
     processEnv: {
-      ...process.env,
+      ...runtime.processEnv,
       FAKE_CAPTURE_PATH: capturePath,
       FAKE_DESCENDANT_PATH: descendantPath,
       FAKE_ENVIRONMENT_CAPTURE_PATH: environmentCapturePath,
@@ -851,12 +855,13 @@ if (args[0] === "app-server") {
     directory,
     environmentCapturePath,
     otherWorkspace,
+    runtime,
     service,
     workspace,
     async close() {
       await this.service.close();
       this.database.close();
-      await rm(directory, { recursive: true, force: true });
+      await runtime.close();
     },
   };
 }
@@ -903,19 +908,23 @@ test("Codex turns use stdin, explicit resume ids, server-owned cwd and sanitized
     ).trim().split("\n").map(JSON.parse);
     assert.ok(environmentCaptures.length >= 3);
     assert.equal(environmentCaptures.every((entry) => entry.launcherKeys.length === 0), true);
+    assert.equal(
+      environmentCaptures.every((entry) => entry.codexHome === fixture.runtime.codexHome),
+      true,
+    );
     assert.deepEqual(captures[0].args, [
       "exec", "--json", "--color", "never",
       "-C", fixture.workspace,
       "-s", "workspace-write",
       "-c", 'approval_policy="on-request"',
       "-c", 'approvals_reviewer="auto_review"',
-      "--add-dir", fixture.otherWorkspace,
       "-m", "gpt-real",
       "-c", 'model_reasoning_effort="high"',
       "-",
     ]);
     assert.equal(captures[0].args.join(" ").includes("HIDDEN_SENTINEL"), false);
-    assert.match(captures[0].prompt, /\[\$manage-taskboard\]\(\/fixture\/manage-taskboard\/SKILL\.md\) e-taskboard/);
+    assert.equal(captures[0].args.includes(fixture.otherWorkspace), false);
+    assert.doesNotMatch(captures[0].prompt, /\[\$manage-taskboard\]/);
     assert.match(
       captures[0].prompt,
       /HIDDEN_SENTINEL \[\$real-skill\]\(\/fixture\/real-skill\/SKILL\.md\) first/,
@@ -926,7 +935,6 @@ test("Codex turns use stdin, explicit resume ids, server-owned cwd and sanitized
       "-s", "workspace-write",
       "-c", 'approval_policy="on-request"',
       "-c", 'approvals_reviewer="auto_review"',
-      "--add-dir", fixture.otherWorkspace,
       "-m", "gpt-real",
       "-c", 'model_reasoning_effort="high"',
       "resume", "codex-thread-1", "-",
@@ -938,6 +946,14 @@ test("Codex turns use stdin, explicit resume ids, server-owned cwd and sanitized
     assert.equal(snapshot.events.some((event) => event.content?.includes("SECRET REASONING")), false);
     assert.equal(snapshot.events.some((event) => event.content === "Visible answer"), true);
     assert.equal(snapshot.events.some((event) => event.type === "command_execution"), true);
+    assert.deepEqual(snapshot.runs.map((run) => ({
+      inputTokens: run.inputTokens,
+      cachedInputTokens: run.cachedInputTokens,
+      outputTokens: run.outputTokens,
+    })), [
+      { inputTokens: 1, cachedInputTokens: null, outputTokens: 2 },
+      { inputTokens: 1, cachedInputTokens: null, outputTokens: 2 },
+    ]);
     const serialized = JSON.stringify(snapshot);
     assert.equal(serialized.includes("HIDDEN_SENTINEL"), true);
     assert.equal(serialized.includes("<taskboard_context>"), false);
@@ -946,6 +962,61 @@ test("Codex turns use stdin, explicit resume ids, server-owned cwd and sanitized
     );
     assert.equal(persisted.includes("<taskboard_context>"), false);
     assert.equal(persisted.includes("SECRET REASONING"), false);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("only an explicit taskboard intent injects the task management Skill", () => {
+  const thread = {
+    origin: {
+      projectId: "project",
+      projectName: "Project",
+      workspacePath: "/fixture/project",
+      issueIdentifier: null,
+    },
+  };
+  const ordinaryPrompt = buildCodexPrompt(
+    thread,
+    { message: "Explain this repository's build setup", skills: [], attachmentPaths: [] },
+    "/fixture/manage-taskboard/SKILL.md",
+  );
+  const archivePrompt = buildCodexPrompt(
+    thread,
+    {
+      message: "归档这条议题，并统计当前项目的已完成任务",
+      skills: [],
+      attachmentPaths: [],
+      taskboardIntent: "mutate",
+    },
+    "/fixture/manage-taskboard/SKILL.md",
+  );
+
+  assert.doesNotMatch(ordinaryPrompt, /\[\$manage-taskboard\]/);
+  assert.match(archivePrompt, /\[\$manage-taskboard\]\(\/fixture\/manage-taskboard\/SKILL\.md\) e-taskboard/);
+});
+
+test("a measured context over the budget must be compacted before resuming", async () => {
+  const fixture = await createFixture();
+  try {
+    const thread = await fixture.service.createThread({ projectId: "project" });
+    fixture.database.updateAiChatThread(thread.id, { codexThreadId: "codex-thread-1" });
+    fixture.database.createAiChatRun({
+      threadId: thread.id,
+      status: "completed",
+      inputTokens: 120_000,
+      finishedAt: new Date().toISOString(),
+    });
+    await assert.rejects(
+      fixture.service.startTurn(thread.id, { message: "one more message" }),
+      (error) => error.code === "AI_CHAT_CONTEXT_BUDGET_EXCEEDED"
+        && error.details.inputTokens === 120_000,
+    );
+    fixture.database.updateAiChatThread(thread.id, {
+      contextCompactedAt: new Date().toISOString(),
+    });
+    const resumed = await fixture.service.startTurn(thread.id, { message: "after compaction" });
+    await waitFor(() => fixture.service.getRun(resumed.id)?.status === "completed");
   } finally {
     await fixture.close();
   }
@@ -976,6 +1047,27 @@ test("same-thread turns are locked, different threads run concurrently, failures
       ),
       true,
     );
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("a failed turn retains its Codex thread id for an isolated resume", async () => {
+  const fixture = await createFixture();
+  try {
+    const thread = await fixture.service.createThread({ projectId: "project" });
+    const failed = await fixture.service.startTurn(thread.id, { message: "FAIL" });
+    await waitFor(() => fixture.service.getRun(failed.id)?.status === "failed");
+
+    assert.equal(fixture.service.getThread(thread.id).codexThreadId, "codex-thread-1");
+    const resumed = await fixture.service.startTurn(thread.id, { message: "continue after failure" });
+    await waitFor(() => fixture.service.getRun(resumed.id)?.status === "completed");
+
+    const captures = (await readFile(fixture.capturePath, "utf8"))
+      .trim()
+      .split("\n")
+      .map(JSON.parse);
+    assert.deepEqual(captures.at(-1).args.slice(-3), ["resume", "codex-thread-1", "-"]);
   } finally {
     await fixture.close();
   }
@@ -1152,8 +1244,10 @@ test("startup marks abandoned runs interrupted while preserving the Codex thread
   const restarted = new AiChatService({
     database: fixture.database,
     codexExecutable: path.join(fixture.directory, "fake-codex.mjs"),
-    codexStatePath: path.join(fixture.directory, "codex-state.json"),
+    codexHome: fixture.runtime.codexHome,
+    codexStatePath: fixture.runtime.codexStatePath,
     manageTaskboardSkillPath: "/fixture/manage-taskboard/SKILL.md",
+    processEnv: fixture.runtime.processEnv,
   });
   fixture.service = restarted;
   try {

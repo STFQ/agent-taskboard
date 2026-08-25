@@ -950,6 +950,7 @@ function parseAiTurn(body) {
   assertAllowedKeys(body, new Set([
     "message",
     "skillIds",
+    "taskboardIntent",
     "dangerFullAccessConfirmed",
     "attachments",
   ]));
@@ -965,6 +966,12 @@ function parseAiTurn(body) {
     throw new ApiError(400, "INVALID_FIELD", "'skillIds' must match the Skill markers in 'message'");
   }
   const attachments = parseAiAttachments(body.attachments);
+  const taskboardIntent = body.taskboardIntent === undefined
+    ? "none"
+    : stringField(body.taskboardIntent, "taskboardIntent", { required: true, maxLength: 16 });
+  if (!["none", "read", "mutate"].includes(taskboardIntent)) {
+    throw new ApiError(400, "INVALID_FIELD", "'taskboardIntent' must be none, read, or mutate");
+  }
   if (message === "" && attachments.length === 0) {
     throw new ApiError(
       400,
@@ -975,6 +982,7 @@ function parseAiTurn(body) {
   return {
     message,
     skillIds,
+    taskboardIntent,
     dangerFullAccessConfirmed: body.dangerFullAccessConfirmed,
     attachments,
   };
@@ -1525,25 +1533,30 @@ async function scanDevelopmentContexts(workspacePath, processEnv = process.env) 
 }
 
 export function resolveServerOptions(options = {}) {
-  const configuredDataDirectory = options.dataDirectory ?? process.env.CODEX_TASKBOARD_DATA_DIR;
+  const environment = options.processEnv ?? process.env;
+  const configuredDataDirectory = options.dataDirectory ?? environment.CODEX_TASKBOARD_DATA_DIR;
   const dataDirectory = configuredDataDirectory
     ? path.resolve(configuredDataDirectory)
     : path.join(PROJECT_ROOT, ".data");
-  const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), ".codex");
+  const configuredCodexHome = options.codexHome ?? environment.CODEX_HOME;
+  const codexHome = typeof configuredCodexHome === "string" && configuredCodexHome.trim()
+    ? configuredCodexHome.trim()
+    : path.join(os.homedir(), ".codex");
   const instanceToken = String(
-    options.instanceToken ?? process.env.CODEX_TASKBOARD_INSTANCE_TOKEN ?? "",
+    options.instanceToken ?? environment.CODEX_TASKBOARD_INSTANCE_TOKEN ?? "",
   ).trim();
   if (instanceToken && !/^[a-z0-9-]{16,128}$/i.test(instanceToken)) {
     throw new Error("CODEX_TASKBOARD_INSTANCE_TOKEN must be an identifier");
   }
   const instanceSecret = String(
-    options.instanceSecret ?? process.env.CODEX_TASKBOARD_INSTANCE_SECRET ?? "",
+    options.instanceSecret ?? environment.CODEX_TASKBOARD_INSTANCE_SECRET ?? "",
   ).trim();
   if (instanceToken && !/^[a-f0-9-]{32,128}$/i.test(instanceSecret)) {
     throw new Error("CODEX_TASKBOARD_INSTANCE_SECRET must be set in launcher mode");
   }
   return {
     dataDirectory,
+    codexHome,
     databasePath: options.databasePath ?? path.join(dataDirectory, "taskboard.sqlite"),
     attachmentsDirectory: options.attachmentsDirectory ?? path.join(dataDirectory, "attachments"),
     cloudConfigPath: options.cloudConfigPath ?? path.join(dataDirectory, "cloud-companion.json"),
@@ -1551,9 +1564,12 @@ export function resolveServerOptions(options = {}) {
     clientStoragePath: options.clientStoragePath ?? path.join(dataDirectory, "client-storage.json"),
     staticDirectory: options.staticDirectory ?? path.join(PROJECT_ROOT, "dist", "web"),
     skillPath: options.skillPath
-      ?? process.env.CODEX_TASKBOARD_SKILL_PATH
+      ?? environment.CODEX_TASKBOARD_SKILL_PATH
       ?? path.join(PROJECT_ROOT, "skills", "manage-taskboard", "SKILL.md"),
-    codexExecutable: resolveCodexExecutable({ explicit: options.codexExecutable }),
+    codexExecutable: resolveCodexExecutable({
+      explicit: options.codexExecutable ?? environment.CODEX_EXECUTABLE,
+      env: environment,
+    }),
     codexStatePath: options.codexStatePath
       ?? path.join(codexHome, ".codex-global-state.json"),
     codexProcessesPath: options.codexProcessesPath
@@ -1561,7 +1577,7 @@ export function resolveServerOptions(options = {}) {
     instanceToken,
     instanceSecret,
     version: String(
-      options.version ?? process.env.CODEX_TASKBOARD_VERSION ?? "development",
+      options.version ?? environment.CODEX_TASKBOARD_VERSION ?? "development",
     ).trim(),
   };
 }
@@ -1584,9 +1600,10 @@ export function resolveHost(value = process.env.CODEX_TASKBOARD_HOST ?? "0.0.0.0
 
 export function createTaskboardServer(options = {}) {
   const resolved = resolveServerOptions(options);
-  const codexProcessEnvironment = withoutTaskboardLauncherEnvironment(
-    options.processEnv ?? process.env,
-  );
+  const codexProcessEnvironment = {
+    ...withoutTaskboardLauncherEnvironment(options.processEnv ?? process.env),
+    CODEX_HOME: resolved.codexHome,
+  };
   const routePrefix = resolved.instanceToken ? `/${resolved.instanceToken}` : "";
   const database = new TaskboardDatabase(resolved.databasePath);
   const events = new EventHub();
@@ -1772,6 +1789,7 @@ export function createTaskboardServer(options = {}) {
   const aiChat = new AiChatService({
     database,
     codexExecutable: resolved.codexExecutable,
+    codexHome: resolved.codexHome,
     codexStatePath: resolved.codexStatePath,
     manageTaskboardSkillPath: resolved.skillPath,
     processEnv: codexProcessEnvironment,

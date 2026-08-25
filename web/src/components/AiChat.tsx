@@ -115,7 +115,8 @@ interface AiChatProps {
   openThreadRequest?: AiChatOpenThreadRequest | null;
 }
 
-type MenuName = "model" | "model-list" | "effort-list" | "sandbox" | null;
+type TaskboardIntent = "none" | "read" | "mutate";
+type MenuName = "model" | "model-list" | "effort-list" | "sandbox" | "taskboard" | null;
 type ComposerDraftNode =
   | ComposerDocument["nodes"][number]
   | ComposerPersistedDocument["nodes"][number];
@@ -1326,6 +1327,7 @@ export function AiChat({
   >(null);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [skillIds, setSkillIds] = useState<string[]>([]);
+  const [taskboardIntent, setTaskboardIntent] = useState<TaskboardIntent>("none");
   const [composerQueryState, setComposerQueryState] = useState<ComposerQuery | null>(null);
   const [composerCandidates, setComposerCandidates] = useState<ComposerCandidatesResponse | null>(null);
   const [composerCandidatesLoading, setComposerCandidatesLoading] = useState(false);
@@ -2505,7 +2507,8 @@ export function AiChat({
         }
       }
     }
-    const useComposerTurn = hasStructuredReference || isTaskOriginPlainTextDraft;
+    const useComposerTurn = taskboardIntent === "none"
+      && (hasStructuredReference || isTaskOriginPlainTextDraft);
     if (useComposerTurn && !hasPersistedReference && !currentComposerRevision) {
       setError(text(
         "补全来源已失效，请重新选择 Skill",
@@ -2605,7 +2608,9 @@ export function AiChat({
             messageSkillIds,
             dangerConfirmed,
             messageAttachments,
+            taskboardIntent,
           ));
+      setTaskboardIntent("none");
       if (clearSubmittedDraft && composerTurnInput) resetComposer();
       observedRunStatusesRef.current.set(run.id, run.status);
       setSnapshot((current) => current?.thread.id === thread.id ? {
@@ -3258,6 +3263,42 @@ export function AiChat({
               >
                 <PlusIcon color="currentColor" size={15} />
               </button>
+              <div className="ai-chat-menu-wrap ai-chat-taskboard-menu-wrap">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={menu === "taskboard"}
+                  title={text("仅在本次需要查询或修改任务时启用", "Enable only when this turn needs task data or a task action")}
+                  onClick={() => setMenu((current) => current === "taskboard" ? null : "taskboard")}
+                >
+                  {taskboardIntent === "none"
+                    ? text("普通对话", "Chat")
+                    : taskboardIntent === "read"
+                      ? text("查询任务", "Read tasks")
+                      : text("任务操作", "Task action")}
+                  <LinearIcon name="chevronDown" />
+                </button>
+                {menu === "taskboard" && (
+                  <div className="ai-chat-option-menu ai-chat-config-menu" role="menu" aria-label={text("本次任务看板权限", "Taskboard access for this turn")}>
+                    {([
+                      ["none", text("普通对话", "Chat"), text("不注入任务看板能力", "Do not inject taskboard capability")],
+                      ["read", text("查询任务", "Read tasks"), text("仅用于查询、统计和汇总当前项目", "Query, count, or summarize the current project")],
+                      ["mutate", text("任务操作", "Task action"), text("用于归档、恢复或修改当前项目任务", "Archive, restore, or edit tasks in the current project")],
+                    ] as const).map(([intent, label, description]) => (
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={taskboardIntent === intent}
+                        key={intent}
+                        onClick={() => { setTaskboardIntent(intent); setMenu(null); }}
+                      >
+                        <span><strong>{label}</strong><small>{description}</small></span>
+                        {taskboardIntent === intent && <LinearIcon name="check" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="ai-chat-menu-wrap ai-chat-permission-menu-wrap">
                 <button
                   className="ai-chat-permission-trigger"

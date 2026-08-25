@@ -368,6 +368,7 @@ export async function startAiChatTurn(
   input: {
     message: string;
     skillIds?: string[];
+    taskboardIntent?: "none" | "read" | "mutate";
     attachments?: AiChatAttachmentInput[];
     dangerFullAccessConfirmed?: boolean;
   },
