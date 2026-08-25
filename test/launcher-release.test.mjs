@@ -30,7 +30,7 @@ test("the managed macOS launcher uses one instance, strict sidebar injection, an
   assert.doesNotMatch(launcherSource, /const LAUNCHER_PORT/);
 });
 
-test("release publishing is version-gated and platform signing status is explicit", () => {
+test("source-only release publishing is version-gated and has no binary assets", () => {
   assert.doesNotMatch(releaseWorkflow, /workflow_dispatch/);
   assert.match(releaseWorkflow, /tags: \[\"v\*\.\*\.\*\"\]/);
   assert.match(releaseWorkflow, /git merge-base --is-ancestor/);
@@ -39,32 +39,24 @@ test("release publishing is version-gated and platform signing status is explici
   assert.match(releaseWorkflow, /tauri\.conf\.json/);
   assert.match(releaseWorkflow, /package-lock\.json/);
   assert.match(releaseWorkflow, /Cargo\.lock/);
-  assert.match(releaseWorkflow, /verify-linux-packages\.mjs/);
-  assert.match(releaseWorkflow, /SHA256SUMS/);
-  assert.match(releaseWorkflow, /SHA256SUMS-windows/);
-  assert.match(releaseWorkflow, /unsigned preview/);
+  assert.match(releaseWorkflow, /gh release create/);
+  assert.doesNotMatch(releaseWorkflow, /app:build|upload-artifact|release-assets/);
   assert.match(releaseWorkflow, /permissions:[\s\S]*contents: read[\s\S]*contents: write/);
   assert.match(checkWorkflow, /npm run typecheck/);
   assert.match(checkWorkflow, /npm run build:web/);
+  assert.match(checkWorkflow, /node --test/);
+  assert.doesNotMatch(checkWorkflow, /macos-launcher|windows-launcher|linux-launcher|app:build|tauri -- build|upload-artifact/);
 });
 
-test("Windows CI runs the Node suite and the unsigned launcher skips unsupported updates", () => {
-  assert.match(
-    checkWorkflow,
-    /windows-launcher:[\s\S]*?run: npm test[\s\S]*?run: npm run app:build:windows/,
-  );
+test("the launcher keeps unsupported Windows updates disabled", () => {
   assert.match(
     launcherSource,
     /cfg!\(target_os = "windows"\)[\s\S]*?Windows 版本暂不支持自动更新/,
   );
 });
 
-test("Windows CI uploads the NSIS installer with the pinned Node 24 artifact action", () => {
-  assert.match(
-    checkWorkflow,
-    /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7\.0\.1/,
-  );
-  assert.doesNotMatch(checkWorkflow, /actions\/upload-artifact@[^\s]+ # v4/);
+test("source-only CI has no platform artifact upload", () => {
+  assert.doesNotMatch(checkWorkflow, /actions\/upload-artifact/);
 });
 
 test("the launcher minimum system version matches the current Codex client requirement", () => {

@@ -1,14 +1,14 @@
 # Code signing policy
 
-Agent Taskboard currently has no project-owned Developer ID or Windows signing
-credentials. macOS and Windows artifacts are therefore preview builds and
-must not be described as stable signed releases.
+Agent Taskboard currently publishes source only. It does not publish macOS,
+Windows, or Linux installers, so no public binary is currently represented as
+signed, stable, or preview.
 
 ## Scope
 
-This policy applies to official Windows executables and installers published
-by the Agent Taskboard project. Development builds, pull-request artifacts,
-and local builds are not signed.
+This policy applies before any future executable or installer is published by
+the Agent Taskboard project. Development builds, pull-request artifacts, and
+local builds are not signed.
 
 ## Team roles
 

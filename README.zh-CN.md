@@ -9,14 +9,14 @@ Agent Taskboard 是一个 local-first（本地优先）的任务看板与 CLI，
 ## 核心能力
 
 - 本地 SQLite 数据，可选自托管 Cloudflare 协作。
-- 支持 macOS、Linux 与 Windows 预览版桌面启动器。
+- 包含面向未来发行的桌面启动器与跨平台打包源码。
 - 面向 Agent 和脚本的 `taskctl` CLI，保留既有 Taskboard skill 命令兼容性。
 - Markdown 描述、标签、优先级、关系、评论、截止日期、自动化和 AI 上下文。
 - Agent 说明见 [`docs/agent-workflows.md`](docs/agent-workflows.md)，索引见 [`llms.txt`](llms.txt)。
 
 ## 安装
 
-从 [GitHub Releases](https://github.com/STFQ/agent-taskboard/releases) 下载 v2.0.0。Linux x64 是稳定发行目标；签名凭据配置前，macOS 与 Windows 仅为未签名预览版，请阅读 Release Notes。
+v2.0.0 是仅源码发布。GitHub 会为 tag 自动提供源码 ZIP 与 tarball；当前不发布 Windows、macOS 或 Linux 安装包。请克隆仓库并按下方快速开始操作，或根据 [`docs/release.md`](docs/release.md) 的平台要求自行构建桌面包。未来启用安装包发布需要单独完成签名、打包和支持门槛。
 
 旧用户请先阅读[ v2 迁移说明](docs/release.md#v2-迁移)。新应用使用 `Agent Taskboard` 数据与日志目录；迁移为手动操作，不会删除旧目录。
 
@@ -30,15 +30,14 @@ npm run taskctl -- issue list --status todo
 ln -s "$PWD/skills/manage-taskboard" "$HOME/.agents/skills/manage-taskboard"
 ```
 
-## 支持矩阵
+## 支持范围
 
 | 平台/集成 | 状态 | 说明 |
 | --- | --- | --- |
-| macOS 14+ | 预览版 | 没有 Developer ID 证书时为未签名构建 |
-| Ubuntu 24.04 x64 | 稳定目标 | `.deb` 与 `.AppImage` |
-| Windows x64 | 预览版 | 未签名 NSIS，不自动更新 |
+| 源码发布 | 可用 | v2.0.0 的 GitHub 自动源码 ZIP 与 tarball |
 | OpenAI Codex | 兼容 | 需要用户自行安装并登录 Codex |
 | 自托管 Cloudflare | 可选 | 见 [`docs/cloud-collaboration.md`](docs/cloud-collaboration.md) |
+| 桌面安装包 | 暂不发布 | 完成未来发布门槛后再启用打包发行 |
 
 ## 隐私与安全
 

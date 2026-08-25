@@ -9,14 +9,14 @@ It integrates with OpenAI Codex and other coding-agent workflows, but is an inde
 ## Highlights
 
 - Local-first SQLite data with optional self-hosted Cloudflare collaboration.
-- Desktop launcher for macOS, Linux, and Windows preview builds.
+- Desktop launcher and platform packaging source for future distribution.
 - `taskctl` CLI for agents and scripts, preserving existing Taskboard skill command compatibility.
 - Markdown descriptions, labels, priorities, relations, comments, due dates, automations, and AI context.
 - Agent guidance in [`docs/agent-workflows.md`](docs/agent-workflows.md) and [`llms.txt`](llms.txt).
 
 ## Install
 
-Download v2.0.0 from [GitHub Releases](https://github.com/STFQ/agent-taskboard/releases). Linux x64 packages are the stable target when the release workflow succeeds. macOS and Windows artifacts are unsigned previews until signing credentials are configured; read the release notes before installing.
+v2.0.0 is a source-only release. GitHub automatically provides the tagged source ZIP and tarball; this project does not currently publish Windows, macOS, or Linux installers. Clone the repository and follow the development quick start below, or build a desktop package locally using the platform requirements in [`docs/release.md`](docs/release.md). Installer publishing will be enabled separately after signing, packaging, and support gates are established.
 
 Existing users should read the [v2 migration note](docs/release.md#v2-migration). The new app uses `Agent Taskboard` data and log directories; migration is manual and does not delete the previous directory.
 
@@ -30,15 +30,14 @@ npm run taskctl -- issue list --status todo
 ln -s "$PWD/skills/manage-taskboard" "$HOME/.agents/skills/manage-taskboard"
 ```
 
-## Support matrix
+## Support scope
 
 | Surface | Status | Notes |
 | --- | --- | --- |
-| macOS 14+ | Preview | Unsigned without a Developer ID certificate |
-| Ubuntu 24.04 x64 | Stable target | `.deb` and `.AppImage` |
-| Windows x64 | Preview | Unsigned NSIS installer; no automatic updates |
+| Source release | Available | GitHub-generated ZIP and tarball for v2.0.0 |
 | OpenAI Codex | Compatible | Requires the user's own Codex installation/account |
 | Self-hosted Cloudflare | Optional | See [`docs/cloud-collaboration.md`](docs/cloud-collaboration.md) |
+| Desktop installers | Not published | Packaging is source-only until a future release gate is approved |
 
 ## Privacy and security
 

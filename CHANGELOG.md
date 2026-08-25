@@ -6,7 +6,10 @@
 
 - Reintroduced the project as Agent Taskboard, an independently maintained local-first taskboard and CLI for coding-agent workflows.
 - Updated package, desktop metadata, data paths, release URLs, documentation, and public maintenance configuration.
-- Documented v2 manual migration and unsigned macOS/Windows preview status.
+- Hardened AI chat context measurement and token-usage recording.
+- Added Taskboard intent injection for agent workflows and isolated runtime hardening.
+- Made completed tasks visible by default on the main board.
+- Documented v2 manual migration and source-only release scope; platform installers are not published yet.
 
 ### Compatibility
 
