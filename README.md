@@ -9,7 +9,7 @@ It integrates with OpenAI Codex and other coding-agent workflows, but is an inde
 ## Highlights
 
 - Local-first SQLite data with optional self-hosted Cloudflare collaboration.
-- Local web server, desktop launcher, and platform builds from source.
+- Local web server, standalone desktop window, and platform builds from source.
 - `taskctl` CLI for agents and scripts, preserving existing Taskboard skill command compatibility.
 - Markdown descriptions, labels, priorities, relations, comments, due dates, automations, and AI context.
 - Agent guidance in [`docs/agent-workflows.md`](docs/agent-workflows.md) and [`llms.txt`](llms.txt).
@@ -75,9 +75,12 @@ ln -s "$PWD/skills/manage-taskboard" "$HOME/.agents/skills/manage-taskboard"
 
 Desktop builds require Node.js 22.5+, Rust 1.88+, and the platform's native build prerequisites. Run each command on its target operating system:
 
+The desktop app is self-contained: opening it starts only its bundled loopback Taskboard service, loads the existing React board in a native Tauri window, and uses `~/Library/Application Support/Agent Taskboard` for the same SQLite data and `taskctl` runtime descriptor. It does not launch or attach to Codex, WorkBuddy, or a browser.
+
 | Target | Command | Output |
 | --- | --- | --- |
 | macOS development app | `npm run app:dev` | Starts the Tauri app from source |
+| macOS Apple Silicon app | `npm run app:build:macos:arm64` | Unsigned arm64 `.app`; no DMG |
 | macOS universal app | `npm run app:build` | Unsigned `.app`; no DMG |
 | Ubuntu 24.04 x64 | `npm run app:build:linux:x64` | `.deb` and AppImage |
 | Windows x64 | `npm run app:build:windows` | Unsigned NSIS installer |

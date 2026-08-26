@@ -4,30 +4,22 @@ import { test } from "node:test";
 
 const launcherSource = await readFile(new URL("../src-tauri/src/main.rs", import.meta.url), "utf8");
 const tauriConfig = JSON.parse(await readFile(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
+const cargoManifest = await readFile(new URL("../src-tauri/Cargo.toml", import.meta.url), "utf8");
+const prepareSource = await readFile(new URL("../scripts/prepare-tauri-app.mjs", import.meta.url), "utf8");
 const releaseWorkflow = await readFile(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
 const checkWorkflow = await readFile(new URL("../.github/workflows/check.yml", import.meta.url), "utf8");
 
-test("the managed macOS launcher uses one instance, strict sidebar injection, and a loopback CDP port", () => {
-  assert.match(launcherSource, /libc::flock/);
-  assert.match(launcherSource, /lifecycle: Mutex/);
-  assert.match(launcherSource, /generation: AtomicU64/);
-  assert.match(launcherSource, /TcpListener::bind\(\("127\.0\.0\.1", 0\)\)/);
-  assert.equal(launcherSource.match(/TcpListener::bind/g)?.length, 1);
-  assert.match(launcherSource, /codex_port: Mutex<Option<u16>>/);
-  assert.match(
-    launcherSource,
-    /#\[cfg\(target_os = "macos"\)\]\s+command\.args\(\[\s*"--launch",\s*"--watch",\s*"--open",\s*"--strict-sidebar",\s*"--exit-on-codex-exit",\s*"--port",\s*&codex_port,\s*\]\);/,
-  );
+test("the macOS app owns a standalone loopback service and native taskboard window", () => {
+  assert.match(launcherSource, /Command::new\(node_command\(\)\?\)/);
+  assert.match(launcherSource, /\.env\("CODEX_TASKBOARD_HOST", "127\.0\.0\.1"\)/);
+  assert.match(launcherSource, /\.env\("CODEX_TASKBOARD_DATA_DIR", &data_dir\)/);
+  assert.match(launcherSource, /write_runtime_descriptor\(&data_dir, &child, &url\)/);
+  assert.match(launcherSource, /WebviewWindowBuilder::new\(app, "main", WebviewUrl::External\(parsed\)\)/);
   assert.match(launcherSource, /set_activation_policy\(ActivationPolicy::Regular\)/);
-  assert.match(launcherSource, /ordinary_codex_processes\(&codex_app, &codex_profile\)/);
-  assert.match(launcherSource, /for codex_pid in ordinary_codex_pids/);
-  assert.match(launcherSource, /normal_codex_exit = matches!/);
-  assert.match(
-    launcherSource,
-    /Codex 已退出，任务面板服务已停止。/,
-  );
-  assert.doesNotMatch(launcherSource, /UPDATE_CHECK_INTERVAL/);
-  assert.doesNotMatch(launcherSource, /const LAUNCHER_PORT/);
+  assert.match(launcherSource, /child\.kill\(\)/);
+  assert.doesNotMatch(launcherSource, /codex-injector|codex-cdp|Google Chrome|\/usr\/bin\/open|restart_codex/i);
+  assert.doesNotMatch(prepareSource, /codex-injector|codex-cdp|agent-taskboard\.user/);
+  assert.deepEqual(tauriConfig.app.windows, []);
 });
 
 test("source-only release publishing is version-gated and has no binary assets", () => {
@@ -48,17 +40,15 @@ test("source-only release publishing is version-gated and has no binary assets",
   assert.doesNotMatch(checkWorkflow, /macos-launcher|windows-launcher|linux-launcher|app:build|tauri -- build|upload-artifact/);
 });
 
-test("the launcher keeps unsupported Windows updates disabled", () => {
-  assert.match(
-    launcherSource,
-    /cfg!\(target_os = "windows"\)[\s\S]*?Windows 版本暂不支持自动更新/,
-  );
+test("the standalone host has no updater, autostart, or dialog plugins", () => {
+  assert.doesNotMatch(cargoManifest, /tauri-plugin-(updater|autostart|dialog)/);
+  assert.equal(tauriConfig.plugins, undefined);
 });
 
 test("source-only CI has no platform artifact upload", () => {
   assert.doesNotMatch(checkWorkflow, /actions\/upload-artifact/);
 });
 
-test("the launcher minimum system version matches the current Codex client requirement", () => {
+test("the standalone app targets the supported macOS baseline", () => {
   assert.equal(tauriConfig.bundle.macOS.minimumSystemVersion, "14.0");
 });

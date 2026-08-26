@@ -24,8 +24,8 @@ function cssBlock(selector) {
 }
 
 test("the issue workspace projects configured statuses into adaptive main and secondary groups", () => {
-  assert.deepEqual(statusList("MAIN_STATUSES"), ["todo", "in_progress", "blocked", "in_review"]);
-  assert.deepEqual(statusList("SECONDARY_STATUSES"), ["backlog", "done", "canceled"]);
+  assert.deepEqual(statusList("MAIN_STATUSES"), ["todo", "in_progress", "in_review", "done"]);
+  assert.deepEqual(statusList("SECONDARY_STATUSES"), ["backlog", "blocked", "canceled"]);
   assert.match(statusSource, /satisfies readonly TaskStatus\[\]/);
   assert.match(appSource, /const mainBoardItems = boardDisplaySettings\.mainStatuses/);
   assert.match(appSource, /mainBoardItems\.map\(\(item\) => item === "archived" \? \([\s\S]*?<BoardColumn/);

@@ -133,6 +133,22 @@ async function extractNodeRuntime(architecture) {
 }
 
 async function prepareMacNodeRuntime() {
+  if (target !== "universal-apple-darwin") {
+    const architecture = target === "aarch64-apple-darwin" ? "arm64" : "x64";
+    const runtime = await extractNodeRuntime(architecture);
+    const targetPath = path.join(binariesDirectory, `node-${target}`);
+    await mkdir(binariesDirectory, { recursive: true });
+    await rm(targetPath, { force: true });
+    await copyFile(path.join(runtime, "bin", "node"), targetPath);
+    await chmod(targetPath, 0o755);
+    await mkdir(path.join(resourcesDirectory, "licenses"), { recursive: true });
+    await copyFile(
+      path.join(runtime, "LICENSE"),
+      path.join(resourcesDirectory, "licenses", "Node-LICENSE"),
+    );
+    return;
+  }
+
   const runtimes = new Map();
   for (const architecture of nodeArchitectures) {
     runtimes.set(architecture, await extractNodeRuntime(architecture));
@@ -246,24 +262,6 @@ async function copyApplicationResources() {
     { recursive: true },
   );
 
-  await mkdir(path.join(appResources, "scripts"), { recursive: true });
-  for (const fileName of [
-    "codex-cdp-pipe.mjs",
-    "codex-injector.mjs",
-    "codex-injector-runtime.mjs",
-    "codex-rate-limits.mjs",
-    "taskboard-supervisor.mjs",
-  ]) {
-    await copyFile(
-      path.join(projectRoot, "scripts", fileName),
-      path.join(appResources, "scripts", fileName),
-    );
-  }
-  await mkdir(path.join(appResources, "inject"), { recursive: true });
-  await copyFile(
-    path.join(projectRoot, "inject", "agent-taskboard.user.js"),
-    path.join(appResources, "inject", "agent-taskboard.user.js"),
-  );
   await mkdir(path.join(appResources, "cli"), { recursive: true });
   await copyFile(
     path.join(projectRoot, "cli", "taskctl.mjs"),
