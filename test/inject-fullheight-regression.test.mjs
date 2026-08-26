@@ -225,7 +225,8 @@ function fixtureHtml(origin) {
 </html>`;
 }
 
-test("Taskboard fills the workspace, opens HTTPS links and revokes hostile iframe navigation", async (t) => {
+// Disabled by repository policy: tests must never launch or automate a browser.
+test.skip("Taskboard fills the workspace, opens HTTPS links and revokes hostile iframe navigation", async (t) => {
   const chrome = await chromeExecutable();
   if (!chrome) {
     t.skip("Chrome or Chromium is not installed");

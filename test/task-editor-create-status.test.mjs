@@ -24,7 +24,8 @@ function chromeExecutable() {
   return candidates.find((candidate) => candidate && existsSync(candidate));
 }
 
-test("a new status entry overrides the old draft status and restores the remaining draft", async (t) => {
+// Disabled by repository policy: tests must never launch or automate a browser.
+test.skip("a new status entry overrides the old draft status and restores the remaining draft", async (t) => {
   const chrome = chromeExecutable();
   if (!chrome) {
     t.skip("Chrome or Chromium is not installed");
